@@ -2,139 +2,71 @@
 
 跨境电商知识产权 Agentic RAG 问答系统
 
-## Project goal
+## Project overview
 
-This repository will implement an Agentic Retrieval-Augmented Generation (RAG) system for cross-border marketplace intellectual property QA. The final system is intended to help answer questions over trademark, patent, patent-litigation, and marketplace policy evidence while preserving source-aware retrieval and evaluation workflows.
+This project is an Agentic RAG system for cross-border marketplace intellectual property QA over trademark, patent, patent litigation, and marketplace policy evidence. It is designed for source-aware answers to questions such as:
+
+- trademark class / goods lookup
+- patent claim explanation
+- Temu policy question answering
+- patent litigation lookup
+- multi-source IP risk analysis
+
+## What this MVP does
+
+- Parses raw trademark XML, patent TSV, litigation CSV, and policy docs.
+- Normalizes records into JSONL documents.
+- Builds logical `EvidenceChunk` records.
+- Builds a DuckDB structured lookup database.
+- Builds a Milvus vector index in real mode or dry-run mode.
+- Supports local BM25 retrieval.
+- Supports dense retrieval through Milvus.
+- Supports RRF fusion and reranking.
+- Runs a deterministic Agentic RAG workflow.
+- Produces adaptive answers with citations.
+- Runs evaluation and ablation experiments.
+- Includes fixture-based end-to-end tests.
+
+## What this MVP does not do
+
+- It is not legal advice.
+- It does not guarantee infringement determination.
+- It does not include a production web UI.
+- It does not expose an API server.
+- It does not train or fine-tune models.
+- It does not include full OCR/image trademark analysis.
+- It does not use an external LLM judge for faithfulness.
+- It does not automatically download USPTO or PatentsView full datasets.
 
 ## Data sources
 
-The planned data sources are:
+The intended evidence sources are:
 
 - USPTO Trademark Full Text XML Data
 - PatentsView Granted Patent Long Text Data
 - Patent Litigation Docket Reports Data
 - Temu policy documents
 
+Example local source paths, for documentation only; these are not hard-coded in Python:
+
+```text
+C:\Users\dyy21\OneDrive\TJ\工作\Code\Rag\Rag_document\Trademark Full Text XML Data
+C:\Users\dyy21\OneDrive\TJ\工作\Code\Rag\Rag_document\PatentsView Granted Patent Long Text Data
+C:\Users\dyy21\OneDrive\TJ\工作\Code\Rag\Rag_document\Patent Litigation Docket Reports Data
+C:\Users\dyy21\OneDrive\TJ\工作\Code\Rag\Rag_document\Temu
+```
+
 Raw data, generated DuckDB files, vector indexes, and large processed artifacts must not be committed.
 
-## Final architecture overview
+## System architecture
 
-The final project structure is designed around these layers:
-
-1. **Ingestion**: parse trademark XML, patent TSV, litigation CSV, and policy documents.
-2. **Chunking**: convert normalized source documents into retrieval chunks.
-3. **Storage**: persist structured metadata in DuckDB and vectors in Milvus.
-4. **Retrieval**: combine BM25, dense retrieval, reciprocal rank fusion, and reranking.
-5. **Agent workflow**: classify questions, plan retrieval, route SQL-style needs, evaluate evidence, and synthesize answers.
-6. **Evaluation**: run retrieval, answer-quality, and ablation experiments.
-
-## Stage roadmap
-
-- **Stage 0**: complete fixed scaffold only.
-- **Stage 1**: core schemas and interfaces.
-- **Stage 2**: source parsers and ingestion scripts.
-- **Stage 3**: chunking.
-- **Stage 4**: DuckDB storage.
-- **Stage 5**: Milvus, embeddings, retrieval, and reranking.
-- **Stage 6**: Agentic RAG workflow and query CLI.
-- **Stage 7**: evaluation and ablation runners.
-- **Stage 8**: end-to-end fixtures, integration tests, and final documentation.
-
-## Current status
-
-Current status: Stage 7 evaluation metrics and ablation runner.
-
-Implemented through Stage 7:
-- fixed scaffold
-- core schemas and interfaces
-- parser IO utilities
-- trademark XML parser
-- patent TSV parser
-- litigation CSV parser
-- policy document parser
-- parser scripts 01–04
-- logical chunking for trademark, patent, policy, and litigation documents
-- chunk build script 05
-- DuckDB structured storage
-- DuckDB exact lookup APIs
-- DuckDB build script 06
-- real embedding provider interfaces
-- OpenAI-compatible embedding provider
-- local sentence-transformer embedding provider
-- real Milvus vector store
-- local BM25 retriever
-- RRF fusion
-- lexical/local/API reranker interfaces
-- HybridRetriever
-- Milvus index build script 07
-- query normalization and classification
-- retrieval planning
-- SQL routing
-- evidence evaluation
-- follow-up retrieval
-- adaptive answer synthesis
-- AgenticRAG orchestration
-- query CLI script 08
-- evaluation dataset loader
-- retrieval/routing/answer proxy metrics
-- evaluation runner script 09
-- ablation runner script 10
-- evaluation and ablation report writers
-
-Still not implemented:
-- Stage 8 end-to-end fixture pipeline
-- final full documentation polish
-
-### Stage 7 evaluation and ablation commands
-
-```bash
-python scripts/09_run_eval.py --eval-file tests/fixtures/eval/eval_queries.jsonl --output-dir data/eval --demo
-python scripts/10_run_ablation.py --eval-file tests/fixtures/eval/eval_queries.jsonl --output-dir data/eval/ablation --demo
-```
-
-Evaluation metrics are deterministic and do not call external LLM judges. FaithfulnessProxy is a heuristic, not a human-level factuality evaluator. Ablation experiments must actually change retrieval/reranking/source configuration. Demo mode uses fixtures and fake embeddings; full evaluation requires processed data and retrieval backends.
-
-### Stage 6 query CLI examples
-
-```bash
-python scripts/08_run_query_cli.py "What does Temu policy say about trademark infringement?" --chunks-path tests/fixtures/agent/sample_chunks.jsonl --demo --output-json
-python scripts/08_run_query_cli.py "Which Nice classes does MERCEDES belong to?" --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --output-json
-```
-
-Only `risk_analysis` answers include `Risk Level`. Plain policy questions about infringement are policy answers, not risk analysis. Normal CLI mode requires DuckDB and/or a retrieval backend; demo mode must be explicit.
-
-### Stage 5 Milvus and retrieval commands
-
-```bash
-docker compose up -d
-python scripts/07_build_milvus_index.py --input data/processed/chunks.jsonl --dry-run --report data/processed/milvus_report.json
-python scripts/07_build_milvus_index.py --input data/processed/chunks.jsonl --collection-name ip_chunks --overwrite --report data/processed/milvus_report.json
-```
-
-FakeEmbeddingProvider is only for tests and smoke runs. Real semantic retrieval requires OpenAI-compatible or local sentence-transformer embeddings. Real Milvus mode requires a running Milvus instance and pymilvus installed. Mock Milvus is only used in unit tests. The Docker Compose stack is for local development and is not required for default tests.
-
-### Stage 2 parser commands
-
-```bash
-python scripts/01_parse_trademark_xml.py --input "<TRADEMARK_RAW_DIR>" --output data/processed/trademarks.jsonl --report data/processed/trademark_report.json
-python scripts/02_parse_patent_tsv.py --input "<PATENT_RAW_DIR>" --output data/processed/patents.jsonl --report data/processed/patent_report.json
-python scripts/03_parse_litigation_csv.py --input "<LITIGATION_RAW_DIR>" --output data/processed/litigation.jsonl --report data/processed/litigation_report.json
-python scripts/04_parse_policy_docs.py --input "<POLICY_RAW_DIR>" --output data/processed/policies.jsonl --report data/processed/policy_report.json
-```
-
-### Stage 3 chunk build commands
-
-```bash
-python scripts/05_build_chunks.py --input data/processed/policies.jsonl --output data/processed/chunks.jsonl --report data/processed/chunk_report.json
-python scripts/05_build_chunks.py --input data/processed/trademarks.jsonl --output data/processed/trademark_chunks.jsonl --report data/processed/trademark_chunk_report.json
-```
-
-### Stage 4 DuckDB build commands
-
-```bash
-python scripts/06_build_duckdb.py --input data/processed/trademarks.jsonl --duckdb-path data/processed/ip.duckdb --report data/processed/duckdb_report.json --overwrite
-python scripts/06_build_duckdb.py --input data/processed/all_docs.jsonl --duckdb-path data/processed/ip.duckdb --report data/processed/duckdb_report.json --overwrite
-```
+1. **Ingestion** parses trademark XML, patent TSV, litigation CSV, and policy documents.
+2. **Normalization** writes source-typed JSONL documents.
+3. **Chunking** converts normalized documents into logical evidence chunks.
+4. **Structured storage** loads fields into DuckDB for exact lookup.
+5. **Retrieval** combines local BM25, optional Milvus dense retrieval, RRF fusion, and reranking.
+6. **Agent workflow** classifies the query, plans retrieval, routes SQL-style lookups, evaluates evidence, and synthesizes adaptive answers.
+7. **Evaluation** computes deterministic retrieval, routing, answer proxy, and ablation metrics.
 
 ## Repository structure
 
@@ -143,17 +75,16 @@ Agentic-RAG-CrossBorder-Marketplace/
 ├── README.md
 ├── pyproject.toml
 ├── .env.example
-├── .gitignore
 ├── docker-compose.yml
 ├── configs/
-├── scripts/
-├── src/crossborder_agentic_rag/
-└── tests/
+├── scripts/                    # scripts 01-10 for pipeline, query, eval, ablation
+├── src/crossborder_agentic_rag/ # ingestion, storage, retrieval, agents, evaluation
+└── tests/                      # unit tests and fixture E2E tests
 ```
 
-The full Stage 0 tree is enforced by `tests/test_stage0_scaffold.py`.
+## Installation
 
-## Set up environment
+Linux/macOS:
 
 ```bash
 python -m venv .venv
@@ -162,15 +93,212 @@ python -m pip install -e '.[dev]'
 cp .env.example .env
 ```
 
-DuckDB is included in the default installation for Stage 4 structured storage. Optional dependencies for local embeddings, Milvus, PDFs, and HTML parsing remain separated into extras.
+Windows PowerShell:
 
-## Run tests
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+python -m pip install -e ".[dev]"
+copy .env.example .env
+```
+
+Optional dependencies:
+
+```bash
+python -m pip install -e '.[milvus]'
+python -m pip install -e '.[local]'
+python -m pip install -e '.[reranker]'
+```
+
+## Environment variables
+
+Key environment variables include:
+
+- `EMBEDDING_PROVIDER`
+- `EMBEDDING_API_KEY`
+- `EMBEDDING_API_BASE`
+- `EMBEDDING_MODEL`
+- `EMBEDDING_DIM`
+- `RERANKER_PROVIDER`
+- `MILVUS_URI`
+- `MILVUS_COLLECTION_NAME`
+- `DUCKDB_PATH`
+- `TRADEMARK_RAW_DIR`
+- `PATENT_RAW_DIR`
+- `LITIGATION_RAW_DIR`
+- `POLICY_RAW_DIR`
+- `MAX_RETRIEVAL_ITERATIONS`
+
+FakeEmbeddingProvider is only for tests and smoke runs. Real semantic retrieval requires OpenAI-compatible or local sentence-transformer embeddings.
+
+## Local fixture quickstart
+
+Run the complete Stage 8 fixture pipeline test:
+
+```bash
+pytest -q tests/test_stage8_end_to_end.py
+```
+
+Manual fixture path examples use `tests/fixtures/e2e` and a temporary or ignored output directory such as `data/processed`.
+
+## Full-data local path examples
+
+Use the environment variables above or substitute quoted paths in commands. Example Windows source folders are documented under **Data sources**. Do not commit full raw datasets or generated artifacts.
+
+## Step-by-step pipeline commands
+
+### Parse trademark
+
+```bash
+python scripts/01_parse_trademark_xml.py --input "<TRADEMARK_RAW_DIR>" --output data/processed/trademarks.jsonl --report data/processed/trademark_report.json
+```
+
+### Parse patent
+
+```bash
+python scripts/02_parse_patent_tsv.py --input "<PATENT_RAW_DIR>" --output data/processed/patents.jsonl --report data/processed/patent_report.json
+```
+
+### Parse litigation
+
+```bash
+python scripts/03_parse_litigation_csv.py --input "<LITIGATION_RAW_DIR>" --output data/processed/litigation.jsonl --report data/processed/litigation_report.json
+```
+
+### Parse policy
+
+```bash
+python scripts/04_parse_policy_docs.py --input "<POLICY_RAW_DIR>" --output data/processed/policies.jsonl --report data/processed/policy_report.json
+```
+
+### Combine JSONL files
+
+Concatenate the four normalized document files into:
+
+```text
+data/processed/all_docs.jsonl
+```
+
+Example:
+
+```bash
+cat data/processed/trademarks.jsonl data/processed/patents.jsonl data/processed/litigation.jsonl data/processed/policies.jsonl > data/processed/all_docs.jsonl
+```
+
+### Build chunks
+
+```bash
+python scripts/05_build_chunks.py --input data/processed/all_docs.jsonl --output data/processed/chunks.jsonl --report data/processed/chunk_report.json
+```
+
+### Build DuckDB
+
+```bash
+python scripts/06_build_duckdb.py --input data/processed/all_docs.jsonl --duckdb-path data/processed/ip.duckdb --report data/processed/duckdb_report.json --overwrite
+```
+
+### Build Milvus dry-run
+
+```bash
+python scripts/07_build_milvus_index.py --input data/processed/chunks.jsonl --dry-run --report data/processed/milvus_report.json
+```
+
+### Build Milvus real mode
+
+```bash
+docker compose up -d
+python scripts/07_build_milvus_index.py --input data/processed/chunks.jsonl --collection-name ip_chunks --overwrite --report data/processed/milvus_report.json
+```
+
+### Run query CLI
+
+```bash
+python scripts/08_run_query_cli.py "What does Temu policy say about trademark infringement?" --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --output-json
+```
+
+### Run evaluation
+
+```bash
+python scripts/09_run_eval.py --eval-file tests/fixtures/e2e/eval/eval_queries.jsonl --output-dir data/eval --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl
+```
+
+### Run ablation
+
+```bash
+python scripts/10_run_ablation.py --eval-file tests/fixtures/e2e/eval/eval_queries.jsonl --output-dir data/eval/ablation --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --experiments bm25_only,hybrid_rrf,no_reranker
+```
+
+## Milvus local development
+
+Real Milvus mode requires a running Milvus instance and pymilvus installed. Mock Milvus is only used in unit tests. Dry-run mode does not insert into Milvus. Dry-run mode should not be interpreted as successful vector indexing.
+
+For local development:
+
+```bash
+docker compose up -d
+python scripts/07_build_milvus_index.py --input data/processed/chunks.jsonl --collection-name ip_chunks --overwrite --report data/processed/milvus_report.json
+```
+
+## Query CLI examples
+
+```bash
+python scripts/08_run_query_cli.py "Which Nice classes does MERCEDES belong to?" --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --output-json
+
+python scripts/08_run_query_cli.py "What does Temu policy say about trademark infringement?" --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --output-json
+
+python scripts/08_run_query_cli.py "Can I sell a phone case using the MERCEDES logo on Temu?" --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --output-json
+
+python scripts/08_run_query_cli.py "Summarize litigation history for patent US1234567." --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --output-json
+```
+
+Only risk_analysis answers include Risk Level. Plain policy questions about infringement are policy answers, not risk analysis.
+
+## Evaluation
+
+```bash
+python scripts/09_run_eval.py --eval-file tests/fixtures/e2e/eval/eval_queries.jsonl --output-dir data/eval --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl
+```
+
+Evaluation metrics are deterministic and do not call external LLM judges. FaithfulnessProxy is a heuristic, not a human-level factuality evaluator. Demo mode uses fixtures and fake embeddings. Full evaluation requires processed data and retrieval backends.
+
+## Ablation
+
+```bash
+python scripts/10_run_ablation.py --eval-file tests/fixtures/e2e/eval/eval_queries.jsonl --output-dir data/eval/ablation --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --experiments bm25_only,hybrid_rrf,no_reranker
+```
+
+Ablation experiments must actually change retrieval/reranking/source configuration.
+
+## Testing
 
 ```bash
 python -m compileall -q src scripts
 pytest -q
+pytest -q tests/test_stage8_end_to_end.py
+rg -n "^(<<<<<<<|=======|>>>>>>>)" -S . || true
 ```
 
-## Data and artifact rule
+## Known limitations
 
-Do not commit raw data or generated artifacts. Keep full local datasets and generated outputs outside version control. The `.gitignore` excludes `data/raw/`, `data/processed/`, `data/eval/`, DuckDB files, SQLite files, and local environment files.
+- Trademark XML field coverage may need expansion for all USPTO variants.
+- Patent TSV column variants are supported but may need adaptation for unseen releases.
+- Policy PDF parsing depends on optional pypdf.
+- HTML parsing is best effort.
+- Fake embeddings are not semantic.
+- Milvus real mode requires external service availability.
+- FaithfulnessProxy is not a substitute for expert review.
+- This project is not legal advice.
+
+## Stage completion status
+
+Stages 0-8 are implemented for the MVP staged workflow:
+
+- Stage 0: fixed scaffold
+- Stage 1: schemas and core interfaces
+- Stage 2: parsers and scripts 01-04
+- Stage 3: chunking and script 05
+- Stage 4: DuckDB and script 06
+- Stage 5: Milvus, BM25, RRF, rerankers, HybridRetriever, and script 07
+- Stage 6: Agentic RAG workflow and script 08
+- Stage 7: evaluation, ablation, and scripts 09-10
+- Stage 8: fixture-based end-to-end pipeline and final documentation
