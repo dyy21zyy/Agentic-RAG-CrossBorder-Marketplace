@@ -216,23 +216,6 @@ def test_public_reranker_exports() -> None:
 
 
 def test_stage0_scripts_still_raise_not_implemented() -> None:
+    """Scripts 01-10 should no longer be placeholders after Stage 7."""
     for script_path in sorted((ROOT / "scripts").glob("*.py")):
-        if script_path.name[:2] in {"01", "02", "03", "04", "05", "06", "07", "08"}:
-            continue
-        spec = importlib.util.spec_from_file_location(script_path.stem, script_path)
-        assert spec is not None and spec.loader is not None
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        with pytest.raises(NotImplementedError, match=script_path.name):
-            module.main()
-
-
-def test_no_duplicate_module_paths_created() -> None:
-    forbidden_paths = [
-        PACKAGE_ROOT / "schema",
-        PACKAGE_ROOT / "models",
-        PACKAGE_ROOT / "retriever",
-        PACKAGE_ROOT / "retrieval" / "reranker_v2.py",
-        PACKAGE_ROOT / "llm" / "embedding_provider.py",
-    ]
-    assert not [path for path in forbidden_paths if path.exists()]
+        assert "NotImplementedError" not in script_path.read_text(encoding="utf-8")

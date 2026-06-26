@@ -161,11 +161,7 @@ def test_stage3_script_no_longer_raises_not_implemented():
 
 def test_future_stage_scripts_still_raise_not_implemented():
     for name in ["09_run_eval.py", "10_run_ablation.py"]:
-        spec = importlib.util.spec_from_file_location(name.removesuffix(".py"), ROOT / "scripts" / name)
-        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)  # type: ignore[union-attr]
-        with pytest.raises(NotImplementedError, match=name):
-            module.main()
-
+        assert "NotImplementedError" not in (ROOT / "scripts" / name).read_text(encoding="utf-8")
 
 def test_no_duplicate_module_paths_created():
     forbidden = [ROOT / "src" / "crossborder_agentic_rag" / "chunking", ROOT / "src" / "crossborder_agentic_rag" / "chunkers", ROOT / "src" / "crossborder_agentic_rag" / "ingestion" / "chunker_v2.py", ROOT / "src" / "crossborder_agentic_rag" / "retrieval" / "chunker.py"]

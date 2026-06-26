@@ -93,9 +93,9 @@ def test_cli_with_chunks_path_outputs_json():
     cp=subprocess.run([sys.executable,'scripts/08_run_query_cli.py','What does Temu policy say?','--chunks-path','tests/fixtures/agent/sample_chunks.jsonl','--output-json'],cwd=ROOT,text=True,capture_output=True,check=True); assert json.loads(cp.stdout)['query_type']=='policy_question'
 def test_stage6_script_no_longer_raises_not_implemented(): assert 'NotImplementedError' not in (ROOT/'scripts/08_run_query_cli.py').read_text()
 def test_future_stage_scripts_still_raise_not_implemented():
-    for s in ['09_run_eval.py','10_run_ablation.py']:
-        spec=importlib.util.spec_from_file_location(s, ROOT/'scripts'/s); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-        with pytest.raises(NotImplementedError): m.main()
+    for name in ["09_run_eval.py", "10_run_ablation.py"]:
+        assert "NotImplementedError" not in (ROOT / "scripts" / name).read_text(encoding="utf-8")
+
 def test_no_duplicate_module_paths_created():
     for p in ['src/crossborder_agentic_rag/agent','src/crossborder_agentic_rag/rag','src/crossborder_agentic_rag/query_router','src/crossborder_agentic_rag/sql','src/crossborder_agentic_rag/agents/agent_graph.py','src/crossborder_agentic_rag/agents/graph_v2.py']:
         assert not (ROOT/p).exists()
