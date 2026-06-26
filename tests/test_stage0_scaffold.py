@@ -168,7 +168,7 @@ def test_gitignore_excludes_local_data_and_secrets() -> None:
 
 def test_scripts_fail_with_not_implemented() -> None:
     for script_name in SCRIPT_FILES:
-        if script_name[:2] in {"01", "02", "03", "04", "05"}:
+        if script_name[:2] in {"01", "02", "03", "04", "05", "06"}:
             continue
         script_path = ROOT / "scripts" / script_name
         spec = importlib.util.spec_from_file_location(script_name.removesuffix(".py"), script_path)

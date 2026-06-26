@@ -42,9 +42,9 @@ The final project structure is designed around these layers:
 
 ## Current status
 
-Current status: Stage 3 logical chunking.
+Current status: Stage 4 DuckDB structured storage.
 
-Implemented through Stage 3:
+Implemented through Stage 4:
 - fixed scaffold
 - core schemas and interfaces
 - parser IO utilities
@@ -55,10 +55,12 @@ Implemented through Stage 3:
 - parser scripts 01–04
 - logical chunking for trademark, patent, policy, and litigation documents
 - chunk build script 05
-- realistic chunking fixtures
+- DuckDB structured storage
+- DuckDB exact lookup APIs
+- DuckDB build script 06
+- realistic DuckDB fixtures
 
 Still not implemented:
-- DuckDB storage
 - Milvus storage and indexing
 - BM25, dense retrieval, RRF
 - real embedding providers
@@ -80,6 +82,13 @@ python scripts/04_parse_policy_docs.py --input "<POLICY_RAW_DIR>" --output data/
 ```bash
 python scripts/05_build_chunks.py --input data/processed/policies.jsonl --output data/processed/chunks.jsonl --report data/processed/chunk_report.json
 python scripts/05_build_chunks.py --input data/processed/trademarks.jsonl --output data/processed/trademark_chunks.jsonl --report data/processed/trademark_chunk_report.json
+```
+
+### Stage 4 DuckDB build commands
+
+```bash
+python scripts/06_build_duckdb.py --input data/processed/trademarks.jsonl --duckdb-path data/processed/ip.duckdb --report data/processed/duckdb_report.json --overwrite
+python scripts/06_build_duckdb.py --input data/processed/all_docs.jsonl --duckdb-path data/processed/ip.duckdb --report data/processed/duckdb_report.json --overwrite
 ```
 
 ## Repository structure
@@ -108,7 +117,7 @@ python -m pip install -e '.[dev]'
 cp .env.example .env
 ```
 
-Optional dependencies for local embeddings, Milvus, DuckDB, PDFs, and HTML parsing are separated into extras so the default installation remains lightweight.
+DuckDB is included in the default installation for Stage 4 structured storage. Optional dependencies for local embeddings, Milvus, PDFs, and HTML parsing remain separated into extras.
 
 ## Run tests
 
