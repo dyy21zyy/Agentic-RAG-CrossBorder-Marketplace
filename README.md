@@ -42,17 +42,20 @@ The final project structure is designed around these layers:
 
 ## Current status
 
-Stage 1 foundation interfaces.
+Current status: Stage 2 source parsers.
 
-Implemented:
-- fixed project scaffold from Stage 0
-- core schemas
-- source-type and route validation
-- deterministic fake embedding provider for tests and smoke runs
-- reranker base interface and NoOpReranker
+Implemented through Stage 2:
+- fixed scaffold
+- core schemas and interfaces
+- parser IO utilities
+- trademark XML parser
+- patent TSV parser
+- litigation CSV parser
+- policy document parser
+- parser scripts 01–04
+- realistic parser fixtures
 
-Not implemented yet:
-- source parsers
+Still not implemented:
 - logical chunking
 - DuckDB storage
 - Milvus storage and indexing
@@ -61,6 +64,15 @@ Not implemented yet:
 - real rerankers
 - Agentic RAG workflow
 - evaluation and ablation
+
+### Stage 2 parser commands
+
+```bash
+python scripts/01_parse_trademark_xml.py --input "<TRADEMARK_RAW_DIR>" --output data/processed/trademarks.jsonl --report data/processed/trademark_report.json
+python scripts/02_parse_patent_tsv.py --input "<PATENT_RAW_DIR>" --output data/processed/patents.jsonl --report data/processed/patent_report.json
+python scripts/03_parse_litigation_csv.py --input "<LITIGATION_RAW_DIR>" --output data/processed/litigation.jsonl --report data/processed/litigation_report.json
+python scripts/04_parse_policy_docs.py --input "<POLICY_RAW_DIR>" --output data/processed/policies.jsonl --report data/processed/policy_report.json
+```
 
 ## Repository structure
 

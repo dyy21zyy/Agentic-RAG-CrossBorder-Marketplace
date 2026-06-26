@@ -1,0 +1,3 @@
+case_row_id,case_number,district_id,doc_number,short_description,long_description,doc_date_filed
+1,1:24-cv-00001,DED,1,Complaint,Patent infringement complaint filed,2024-01-02
+1,1:24-cv-00001,DED,12,Order,Order on preliminary injunction,2024-02-10
