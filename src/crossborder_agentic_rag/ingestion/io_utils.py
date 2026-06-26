@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Iterable
 
 from crossborder_agentic_rag.schemas.documents import NormalizedDocument
+from crossborder_agentic_rag.schemas.evidence import EvidenceChunk
 
 
 def ensure_input_dir(input_dir: str | Path) -> Path:
@@ -39,6 +40,26 @@ def read_documents_jsonl(input_path: str | Path) -> list[NormalizedDocument]:
             if line.strip():
                 docs.append(NormalizedDocument.from_dict(json.loads(line)))
     return docs
+
+
+
+def write_chunks_jsonl(chunks: Iterable[EvidenceChunk], output_path: str | Path) -> int:
+    path = ensure_parent_dir(output_path)
+    count = 0
+    with path.open("w", encoding="utf-8") as fh:
+        for chunk in chunks:
+            fh.write(json.dumps(chunk.to_dict(), ensure_ascii=False) + "\n")
+            count += 1
+    return count
+
+
+def read_chunks_jsonl(input_path: str | Path) -> list[EvidenceChunk]:
+    chunks: list[EvidenceChunk] = []
+    with Path(input_path).open("r", encoding="utf-8") as fh:
+        for line in fh:
+            if line.strip():
+                chunks.append(EvidenceChunk.from_dict(json.loads(line)))
+    return chunks
 
 
 def write_report(report: dict, report_path: str | Path) -> None:
