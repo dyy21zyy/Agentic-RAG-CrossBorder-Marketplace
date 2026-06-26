@@ -207,7 +207,7 @@ python scripts/07_build_milvus_index.py --input data/processed/chunks.jsonl --dr
 
 ```bash
 docker compose up -d
-python scripts/07_build_milvus_index.py --input data/processed/chunks.jsonl --collection-name ip_chunks --overwrite --report data/processed/milvus_report.json
+python scripts/07_build_milvus_index.py --input data/processed/chunks.jsonl --collection-name ip_chunks --embedding-provider local --overwrite --report data/processed/milvus_report.json
 ```
 
 ### Run query CLI
@@ -230,13 +230,13 @@ python scripts/10_run_ablation.py --eval-file tests/fixtures/e2e/eval/eval_queri
 
 ## Milvus local development
 
-Real Milvus mode requires a running Milvus instance and pymilvus installed. Mock Milvus is only used in unit tests. Dry-run mode does not insert into Milvus. Dry-run mode should not be interpreted as successful vector indexing.
+Real Milvus mode requires a running Milvus instance, pymilvus installed, and real embeddings configured with `--embedding-provider openai-compatible` or `--embedding-provider local`. Mock Milvus is only used in unit tests. Dry-run mode does not insert into Milvus. Dry-run mode should not be interpreted as successful vector indexing.
 
 For local development:
 
 ```bash
 docker compose up -d
-python scripts/07_build_milvus_index.py --input data/processed/chunks.jsonl --collection-name ip_chunks --overwrite --report data/processed/milvus_report.json
+python scripts/07_build_milvus_index.py --input data/processed/chunks.jsonl --collection-name ip_chunks --embedding-provider local --overwrite --report data/processed/milvus_report.json
 ```
 
 ## Query CLI examples
@@ -268,6 +268,23 @@ python scripts/10_run_ablation.py --eval-file tests/fixtures/e2e/eval/eval_queri
 ```
 
 Ablation experiments must actually change retrieval/reranking/source configuration.
+
+## Real-data readiness checklist
+
+Before running on full datasets:
+
+- Set `TRADEMARK_RAW_DIR`, `PATENT_RAW_DIR`, `LITIGATION_RAW_DIR`, and `POLICY_RAW_DIR` to local raw-data locations.
+- Run parser scripts 01-04 for trademark, patent, litigation, and policy inputs.
+- Combine normalized JSONL files into `data/processed/all_docs.jsonl`.
+- Run chunking script 05.
+- Run DuckDB build script 06.
+- Run Milvus dry-run script 07 first to validate chunk loading and embedding dimensions without insertion.
+- Start Milvus with docker compose for real vector indexing.
+- Use real embeddings for semantic retrieval; fake embeddings are for tests and smoke runs only.
+- Run the query CLI.
+- Run evaluation and ablation after processed data and retrieval backends are available.
+
+Full-data execution may take time and disk space. Do not commit raw or processed full-data artifacts.
 
 ## Testing
 
