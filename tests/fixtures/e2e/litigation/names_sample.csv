@@ -1,0 +1,3 @@
+case_row_id,case_number,district_id,name_long,party_type
+1,1:23-cv-00001,ded,Example Robotics LLC,plaintiff
+1,1:23-cv-00001,ded,Delivery Drone Inc.,defendant

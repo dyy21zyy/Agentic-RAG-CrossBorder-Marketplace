@@ -1,0 +1,2 @@
+case_row_id,case_number,district_id,court_name,case_name,date_filed,date_closed
+1,1:23-cv-00001,ded,District of Delaware,Example Robotics LLC v. Delivery Drone Inc.,2023-01-15,2023-08-20
