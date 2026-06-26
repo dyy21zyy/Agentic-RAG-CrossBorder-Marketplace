@@ -42,9 +42,9 @@ The final project structure is designed around these layers:
 
 ## Current status
 
-Current status: Stage 2 source parsers.
+Current status: Stage 3 logical chunking.
 
-Implemented through Stage 2:
+Implemented through Stage 3:
 - fixed scaffold
 - core schemas and interfaces
 - parser IO utilities
@@ -53,10 +53,11 @@ Implemented through Stage 2:
 - litigation CSV parser
 - policy document parser
 - parser scripts 01–04
-- realistic parser fixtures
+- logical chunking for trademark, patent, policy, and litigation documents
+- chunk build script 05
+- realistic chunking fixtures
 
 Still not implemented:
-- logical chunking
 - DuckDB storage
 - Milvus storage and indexing
 - BM25, dense retrieval, RRF
@@ -72,6 +73,13 @@ python scripts/01_parse_trademark_xml.py --input "<TRADEMARK_RAW_DIR>" --output 
 python scripts/02_parse_patent_tsv.py --input "<PATENT_RAW_DIR>" --output data/processed/patents.jsonl --report data/processed/patent_report.json
 python scripts/03_parse_litigation_csv.py --input "<LITIGATION_RAW_DIR>" --output data/processed/litigation.jsonl --report data/processed/litigation_report.json
 python scripts/04_parse_policy_docs.py --input "<POLICY_RAW_DIR>" --output data/processed/policies.jsonl --report data/processed/policy_report.json
+```
+
+### Stage 3 chunk build commands
+
+```bash
+python scripts/05_build_chunks.py --input data/processed/policies.jsonl --output data/processed/chunks.jsonl --report data/processed/chunk_report.json
+python scripts/05_build_chunks.py --input data/processed/trademarks.jsonl --output data/processed/trademark_chunks.jsonl --report data/processed/trademark_chunk_report.json
 ```
 
 ## Repository structure
