@@ -2,4 +2,4 @@ mode: hybrid_rrf
 top_k: 20
 rrf_k: 60
 use_reranker: true
-bm25_backend: milvus
+bm25_backend: local

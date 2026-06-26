@@ -42,9 +42,9 @@ The final project structure is designed around these layers:
 
 ## Current status
 
-Current status: Stage 4 DuckDB structured storage.
+Current status: Stage 5 real Milvus hybrid retrieval layer.
 
-Implemented through Stage 4:
+Implemented through Stage 5:
 - fixed scaffold
 - core schemas and interfaces
 - parser IO utilities
@@ -58,15 +58,32 @@ Implemented through Stage 4:
 - DuckDB structured storage
 - DuckDB exact lookup APIs
 - DuckDB build script 06
-- realistic DuckDB fixtures
+- real embedding provider interfaces
+- OpenAI-compatible embedding provider
+- local sentence-transformer embedding provider
+- real Milvus vector store
+- local BM25 retriever
+- RRF fusion
+- lexical/local/API reranker interfaces
+- HybridRetriever
+- Milvus index build script 07
+- local Milvus docker-compose
 
 Still not implemented:
-- Milvus storage and indexing
-- BM25, dense retrieval, RRF
-- real embedding providers
-- real rerankers
 - Agentic RAG workflow
+- query classification
+- answer generation
 - evaluation and ablation
+
+### Stage 5 Milvus and retrieval commands
+
+```bash
+docker compose up -d
+python scripts/07_build_milvus_index.py --input data/processed/chunks.jsonl --dry-run --report data/processed/milvus_report.json
+python scripts/07_build_milvus_index.py --input data/processed/chunks.jsonl --collection-name ip_chunks --overwrite --report data/processed/milvus_report.json
+```
+
+FakeEmbeddingProvider is only for tests and smoke runs. Real semantic retrieval requires OpenAI-compatible or local sentence-transformer embeddings. Real Milvus mode requires a running Milvus instance and pymilvus installed. Mock Milvus is only used in unit tests. The Docker Compose stack is for local development and is not required for default tests.
 
 ### Stage 2 parser commands
 
