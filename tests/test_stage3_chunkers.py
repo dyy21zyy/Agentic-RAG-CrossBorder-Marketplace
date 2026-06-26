@@ -160,7 +160,7 @@ def test_stage3_script_no_longer_raises_not_implemented():
 
 
 def test_future_stage_scripts_still_raise_not_implemented():
-    for name in ["08_run_query_cli.py", "09_run_eval.py", "10_run_ablation.py"]:
+    for name in ["09_run_eval.py", "10_run_ablation.py"]:
         spec = importlib.util.spec_from_file_location(name.removesuffix(".py"), ROOT / "scripts" / name)
         module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)  # type: ignore[union-attr]
         with pytest.raises(NotImplementedError, match=name):

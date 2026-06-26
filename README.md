@@ -42,9 +42,9 @@ The final project structure is designed around these layers:
 
 ## Current status
 
-Current status: Stage 5 real Milvus hybrid retrieval layer.
+Current status: Stage 6 Agentic RAG workflow and adaptive answers.
 
-Implemented through Stage 5:
+Implemented through Stage 6:
 - fixed scaffold
 - core schemas and interfaces
 - parser IO utilities
@@ -67,13 +67,29 @@ Implemented through Stage 5:
 - lexical/local/API reranker interfaces
 - HybridRetriever
 - Milvus index build script 07
-- local Milvus docker-compose
+- query normalization and classification
+- retrieval planning
+- SQL routing
+- evidence evaluation
+- follow-up retrieval
+- adaptive answer synthesis
+- AgenticRAG orchestration
+- query CLI script 08
 
 Still not implemented:
-- Agentic RAG workflow
-- query classification
-- answer generation
-- evaluation and ablation
+- evaluation metrics
+- evaluation dataset runner
+- ablation runner
+
+
+### Stage 6 query CLI examples
+
+```bash
+python scripts/08_run_query_cli.py "What does Temu policy say about trademark infringement?" --chunks-path tests/fixtures/agent/sample_chunks.jsonl --demo --output-json
+python scripts/08_run_query_cli.py "Which Nice classes does MERCEDES belong to?" --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --output-json
+```
+
+Only `risk_analysis` answers include `Risk Level`. Plain policy questions about infringement are policy answers, not risk analysis. Normal CLI mode requires DuckDB and/or a retrieval backend; demo mode must be explicit.
 
 ### Stage 5 Milvus and retrieval commands
 

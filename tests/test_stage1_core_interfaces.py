@@ -217,7 +217,7 @@ def test_public_reranker_exports() -> None:
 
 def test_stage0_scripts_still_raise_not_implemented() -> None:
     for script_path in sorted((ROOT / "scripts").glob("*.py")):
-        if script_path.name[:2] in {"01", "02", "03", "04", "05", "06", "07"}:
+        if script_path.name[:2] in {"01", "02", "03", "04", "05", "06", "07", "08"}:
             continue
         spec = importlib.util.spec_from_file_location(script_path.stem, script_path)
         assert spec is not None and spec.loader is not None
