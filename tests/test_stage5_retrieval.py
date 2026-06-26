@@ -76,9 +76,9 @@ def test_build_milvus_index_real_mode_fails_clearly_without_milvus(tmp_path):
     r=tmp_path/'r.json'; p=subprocess.run([sys.executable,'scripts/07_build_milvus_index.py','--input',str(FIX),'--collection-name','ip_chunks','--overwrite','--report',str(r)],cwd=ROOT,text=True,capture_output=True); assert p.returncode!=0 and ('pymilvus is required' in p.stderr or 'Milvus' in p.stderr or 'Connect' in p.stderr)
 def test_stage5_script_no_longer_raises_not_implemented(): assert 'NotImplementedError' not in (ROOT/'scripts/07_build_milvus_index.py').read_text()
 def test_future_stage_scripts_still_raise_not_implemented():
-    for name in ['09_run_eval.py','10_run_ablation.py']:
-        spec=importlib.util.spec_from_file_location(name,ROOT/'scripts'/name); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-        with pytest.raises(NotImplementedError): m.main()
+    for name in ["09_run_eval.py", "10_run_ablation.py"]:
+        assert "NotImplementedError" not in (ROOT / "scripts" / name).read_text(encoding="utf-8")
+
 def test_no_duplicate_module_paths_created():
     forbidden=['src/crossborder_agentic_rag/vectorstore','src/crossborder_agentic_rag/vector_store','src/crossborder_agentic_rag/retriever','src/crossborder_agentic_rag/retrieval/hybrid.py','src/crossborder_agentic_rag/storage/milvus.py']
     assert not [p for p in forbidden if (ROOT/p).exists()]

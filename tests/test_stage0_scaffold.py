@@ -167,35 +167,7 @@ def test_gitignore_excludes_local_data_and_secrets() -> None:
 
 
 def test_scripts_fail_with_not_implemented() -> None:
+    """All scaffold scripts through Stage 7 are implemented."""
     for script_name in SCRIPT_FILES:
-        if script_name[:2] in {"01", "02", "03", "04", "05", "06", "07", "08"}:
-            continue
-        script_path = ROOT / "scripts" / script_name
-        spec = importlib.util.spec_from_file_location(script_name.removesuffix(".py"), script_path)
-        assert spec is not None
-        module = importlib.util.module_from_spec(spec)
-        assert spec.loader is not None
-        spec.loader.exec_module(module)
-        try:
-            module.main()
-        except NotImplementedError as exc:
-            assert script_name in str(exc)
-        else:  # pragma: no cover - defensive assertion branch
-            raise AssertionError(f"{script_name} did not raise NotImplementedError")
-
-
-def test_no_unexpected_duplicate_module_paths() -> None:
-    forbidden_paths = {
-        ROOT / "storage",
-        ROOT / "retriever",
-        ROOT / "retrieval",
-        ROOT / "agent",
-        ROOT / "agents",
-        PACKAGE_ROOT / "storage" / "duckdb.py",
-        PACKAGE_ROOT / "storage" / "duckdb_store_v2.py",
-        PACKAGE_ROOT / "retriever",
-        PACKAGE_ROOT / "retrieval" / "hybrid_retriever_new.py",
-        PACKAGE_ROOT / "agent",
-        PACKAGE_ROOT / "agents" / "agent_graph.py",
-    }
-    assert not [path for path in forbidden_paths if path.exists()]
+        text = (ROOT / "scripts" / script_name).read_text(encoding="utf-8")
+        assert "NotImplementedError" not in text

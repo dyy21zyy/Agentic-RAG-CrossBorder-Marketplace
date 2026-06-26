@@ -42,9 +42,9 @@ The final project structure is designed around these layers:
 
 ## Current status
 
-Current status: Stage 6 Agentic RAG workflow and adaptive answers.
+Current status: Stage 7 evaluation metrics and ablation runner.
 
-Implemented through Stage 6:
+Implemented through Stage 7:
 - fixed scaffold
 - core schemas and interfaces
 - parser IO utilities
@@ -75,12 +75,24 @@ Implemented through Stage 6:
 - adaptive answer synthesis
 - AgenticRAG orchestration
 - query CLI script 08
+- evaluation dataset loader
+- retrieval/routing/answer proxy metrics
+- evaluation runner script 09
+- ablation runner script 10
+- evaluation and ablation report writers
 
 Still not implemented:
-- evaluation metrics
-- evaluation dataset runner
-- ablation runner
+- Stage 8 end-to-end fixture pipeline
+- final full documentation polish
 
+### Stage 7 evaluation and ablation commands
+
+```bash
+python scripts/09_run_eval.py --eval-file tests/fixtures/eval/eval_queries.jsonl --output-dir data/eval --demo
+python scripts/10_run_ablation.py --eval-file tests/fixtures/eval/eval_queries.jsonl --output-dir data/eval/ablation --demo
+```
+
+Evaluation metrics are deterministic and do not call external LLM judges. FaithfulnessProxy is a heuristic, not a human-level factuality evaluator. Ablation experiments must actually change retrieval/reranking/source configuration. Demo mode uses fixtures and fake embeddings; full evaluation requires processed data and retrieval backends.
 
 ### Stage 6 query CLI examples
 
