@@ -1,0 +1,10 @@
+uri: ${MILVUS_URI}
+token: ${MILVUS_TOKEN}
+collection_name: ${MILVUS_COLLECTION_NAME}
+metric_type: COSINE
+index_type: HNSW
+params:
+  M: 16
+  efConstruction: 200
+search_params:
+  ef: 64

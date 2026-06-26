@@ -1,0 +1,10 @@
+raw:
+  trademark: ${TRADEMARK_RAW_DIR}
+  patent: ${PATENT_RAW_DIR}
+  litigation: ${LITIGATION_RAW_DIR}
+  policy: ${POLICY_RAW_DIR}
+
+processed:
+  docs_dir: data/processed
+  chunks_path: data/processed/chunks.jsonl
+  ingestion_report: data/processed/ingestion_report.json
