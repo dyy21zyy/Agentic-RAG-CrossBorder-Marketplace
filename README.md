@@ -42,30 +42,25 @@ The final project structure is designed around these layers:
 
 ## Current status
 
-Stage 0 scaffold only. The repository currently defines the final folder and file layout, configuration templates, script placeholders, and scaffold tests.
+Stage 1 foundation interfaces.
 
-## Implemented in Stage 0
+Implemented:
+- fixed project scaffold from Stage 0
+- core schemas
+- source-type and route validation
+- deterministic fake embedding provider for tests and smoke runs
+- reranker base interface and NoOpReranker
 
-- Complete fixed project structure.
-- Minimal configuration files under `configs/`.
-- `.env.example` with non-secret environment variable names.
-- `.gitignore` rules for secrets, raw data, processed data, databases, and cache files.
-- Importable Python package and subpackages.
-- Script placeholders that raise `NotImplementedError`.
-- Stage 0 tests for scaffold completeness.
-
-## Not implemented yet
-
-- Schemas and data models.
-- Real source parsers.
-- Chunking logic.
-- DuckDB storage.
-- Milvus storage and indexing.
-- BM25, dense retrieval, RRF, and reranking.
-- Agentic RAG workflow.
-- Evaluation metrics and reports.
-- Ablation runner.
-- Real command-line behavior.
+Not implemented yet:
+- source parsers
+- logical chunking
+- DuckDB storage
+- Milvus storage and indexing
+- BM25, dense retrieval, RRF
+- real embedding providers
+- real rerankers
+- Agentic RAG workflow
+- evaluation and ablation
 
 ## Repository structure
 
