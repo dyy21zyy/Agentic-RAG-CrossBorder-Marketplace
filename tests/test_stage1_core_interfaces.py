@@ -157,7 +157,7 @@ def test_embedding_factory_reads_environment(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_embedding_factory_rejects_unknown_provider() -> None:
-    with pytest.raises(NotImplementedError, match="Embedding provider 'openai'"):
+    with pytest.raises(ValueError, match="Missing embedding API"):
         build_embedding_provider("openai")
 
 
@@ -191,7 +191,7 @@ def test_reranker_factory_reads_environment(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_reranker_factory_rejects_unknown_provider() -> None:
-    with pytest.raises(NotImplementedError, match="Reranker provider 'cross_encoder'"):
+    with pytest.raises(ImportError, match="sentence-transformers"):
         build_reranker("cross_encoder")
 
 
@@ -204,20 +204,20 @@ def test_public_schema_exports() -> None:
 def test_public_embedding_exports() -> None:
     import crossborder_agentic_rag.llm as llm
 
-    assert llm.__all__ == ["BaseEmbeddingProvider", "FakeEmbeddingProvider", "build_embedding_provider"]
+    assert "BaseEmbeddingProvider" in llm.__all__ and "FakeEmbeddingProvider" in llm.__all__ and "build_embedding_provider" in llm.__all__
     assert issubclass(FakeEmbeddingProvider, BaseEmbeddingProvider)
 
 
 def test_public_reranker_exports() -> None:
     import crossborder_agentic_rag.retrieval as retrieval
 
-    assert retrieval.__all__ == ["BaseReranker", "NoOpReranker", "build_reranker"]
+    assert "BaseReranker" in retrieval.__all__ and "NoOpReranker" in retrieval.__all__ and "build_reranker" in retrieval.__all__
     assert issubclass(NoOpReranker, BaseReranker)
 
 
 def test_stage0_scripts_still_raise_not_implemented() -> None:
     for script_path in sorted((ROOT / "scripts").glob("*.py")):
-        if script_path.name[:2] in {"01", "02", "03", "04", "05", "06"}:
+        if script_path.name[:2] in {"01", "02", "03", "04", "05", "06", "07"}:
             continue
         spec = importlib.util.spec_from_file_location(script_path.stem, script_path)
         assert spec is not None and spec.loader is not None

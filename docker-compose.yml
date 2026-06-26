@@ -1,3 +1,21 @@
-# Stage 0 placeholder only.
-# Real Milvus docker-compose service will be completed in Stage 5.
-# No services are defined in Stage 0 to avoid providing a broken local stack.
+services:
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    volumes: [etd-data:/etcd]
+  minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    environment: {MINIO_ACCESS_KEY: minioadmin, MINIO_SECRET_KEY: minioadmin}
+    command: minio server /minio_data
+    ports: ["9000:9000"]
+    volumes: [minio-data:/minio_data]
+  milvus:
+    image: milvusdb/milvus:v2.4.12
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    ports: ["19530:19530", "9091:9091"]
+    depends_on: [etcd, minio]
+    volumes: [milvus-data:/var/lib/milvus]
+volumes: {etd-data: {}, minio-data: {}, milvus-data: {}}

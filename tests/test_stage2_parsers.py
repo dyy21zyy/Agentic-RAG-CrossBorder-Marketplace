@@ -118,7 +118,7 @@ def test_stage2_scripts_no_longer_raise_not_implemented():
 
 def test_future_stage_scripts_still_raise_not_implemented():
     for script_path in sorted((ROOT / "scripts").glob("*.py")):
-        if script_path.name[:2] in {"01", "02", "03", "04", "05", "06"}: continue
+        if script_path.name[:2] in {"01", "02", "03", "04", "05", "06", "07"}: continue
         spec = importlib.util.spec_from_file_location(script_path.stem, script_path)
         module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)  # type: ignore[union-attr]
         try: module.main()
