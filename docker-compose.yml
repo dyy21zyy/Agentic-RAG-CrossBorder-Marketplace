@@ -1,0 +1,3 @@
+# Stage 0 placeholder only.
+# Real Milvus docker-compose service will be completed in Stage 5.
+# No services are defined in Stage 0 to avoid providing a broken local stack.

@@ -1,0 +1,36 @@
+[project]
+name = "crossborder-agentic-rag"
+version = "0.1.0"
+description = "Agentic RAG for cross-border marketplace intellectual property QA"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+local = [
+    "sentence-transformers>=2.0",
+]
+milvus = [
+    "pymilvus>=2.4",
+]
+duckdb = [
+    "duckdb>=0.10",
+]
+pdf = [
+    "pypdf>=4.0",
+]
+html = [
+    "beautifulsoup4>=4.12",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+markers = [
+    "integration: tests requiring external services such as Milvus"
+]
