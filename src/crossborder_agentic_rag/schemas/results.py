@@ -22,7 +22,11 @@ class AgentState:
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     sql_results: list[Any] = field(default_factory=list)
     retrieved_evidence: list[EvidenceChunk] = field(default_factory=list)
+    candidate_evidence: list[EvidenceChunk] = field(default_factory=list)
     reranked_evidence: list[EvidenceChunk] = field(default_factory=list)
+    reranker_provider: str | None = None
+    retrieval_mode: str | None = None
+    candidate_k: int | None = None
     evidence_gaps: list[str] = field(default_factory=list)
     iterations: int = 0
     answer: str = ""
