@@ -32,6 +32,13 @@ class AgenticRAG:
         except TypeError as exc:
             if "candidate_k" not in str(exc): raise
             return self.retriever.retrieve(query, dense_vector=vec, filters=plan.filters, top_k=plan.top_k, source_types=st, mode=selected_mode)
+
+    def _finalize_evidence(self, query, evidence, top_k):
+        deduped = dedupe_chunks(evidence)
+        reranker = getattr(self.retriever, "reranker", None) if self.retriever is not None else None
+        if self.retrieval_mode == "hybrid_rerank" and reranker is not None:
+            return deduped, dedupe_chunks(reranker.rerank(query, deduped, top_k))[:top_k], {"tool": "final_rerank", "payload": {"reranker_provider": self._reranker_provider(), "input_evidence_count": len(deduped), "output_evidence_count": min(len(deduped), top_k)}}
+        return deduped, deduped[:top_k], None
     def run(self, query: str) -> AgentState:
         state=AgentState(query=query); state.retrieval_mode=self.retrieval_mode; state.candidate_k=self.candidate_k; state.reranker_provider=self._reranker_provider()
         cls=classify_query(query); state.normalized_query=cls.normalized_query; state.add_trace("normalize_query"); state.query_type=cls.query_type; state.expected_answer_type=cls.expected_answer_type; state.retrieval_route=cls.retrieval_route; state.add_trace("classify_query")
@@ -55,7 +62,9 @@ class AgenticRAG:
                 state.add_trace("query_rewrite")
                 more=self._retrieve(fq, plan, source_types=[st]); state.retrieved_evidence=dedupe_chunks([*state.retrieved_evidence,*more]); state.add_tool_call("hybrid_retriever", self._payload(plan.top_k,[st],fq)); state.add_trace("followup_retrieval")
             ev=evaluate_evidence(plan, state.retrieved_evidence, state.sql_results); state.evidence_gaps=ev.evidence_gaps; state.add_trace("evaluate_evidence")
-        state.reranked_evidence=dedupe_chunks(state.retrieved_evidence)
+        state.retrieved_evidence, state.reranked_evidence, final_call = self._finalize_evidence(plan.query, state.retrieved_evidence, plan.top_k)
+        if final_call is not None:
+            state.add_tool_call(final_call["tool"], final_call["payload"]); state.add_trace("final_rerank")
         evidence=state.reranked_evidence or dedupe_chunks(state.retrieved_evidence)
         state.answer,state.citations=synthesize_answer(plan, state.sql_results, evidence, state.evidence_gaps); state.add_trace("final_answer")
         return state

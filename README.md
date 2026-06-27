@@ -548,3 +548,91 @@ python scripts/compare_eval_runs.py \
 - `LatencyMs` and output count metrics help compare efficiency and cost tradeoffs.
 
 This system is not legal advice, and evaluation outputs should not be treated as legal conclusions.
+
+## Phase 5: Production runtime hardening
+
+Phase 5 turns the runtime into a production-like Agentic RAG demo. Interactive chat now builds expensive resources once at startup: chunks for BM25, Milvus/Milvus Lite connections for dense retrieval, embedding providers when needed, rerankers, `AgenticRAG`, and the optional LLM chat client. Each user question reuses that runtime instead of rebuilding retrieval resources.
+
+The default runtime mode is `agentic`: classify → plan → retrieve → evaluate → optional follow-up retrieval → final rerank → grounded answer. `basic_rag` remains available only as the controlled non-agent baseline for experiments. Hybrid modes require both chunks JSONL for BM25 and Milvus or Milvus Lite for dense retrieval. The project focuses on trademark, patent, and litigation evidence; policy evidence is not required by default. Generated answers are retrieval-grounded marketplace compliance research aids and are not legal advice.
+
+LLM support is provider-neutral. Configure an OpenAI-compatible endpoint with `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL`; `OPENAI_*` variables are accepted for backward compatibility. No vendor endpoint or model is hard-coded. Use `--llm-provider template` for offline demos and CI.
+
+### Phase 5 commands
+
+Offline demo:
+
+```bash
+python scripts/run_agentic_rag.py \
+  --demo \
+  --pipeline-mode agentic \
+  --retrieval-mode hybrid_rerank \
+  --reranker-provider lexical \
+  --query "What trademark and patent risks should a seller consider for a smart travel bag product?" \
+  --use-llm \
+  --llm-provider template \
+  --show-trace
+```
+
+BM25-only with chunks:
+
+```bash
+python scripts/run_agentic_rag.py \
+  --chunks-path data/processed/chunks_qa_300k.jsonl \
+  --pipeline-mode agentic \
+  --retrieval-mode bm25_only \
+  --query "Find patent claims related to drone delivery control." \
+  --show-trace
+```
+
+True hybrid with Milvus:
+
+```bash
+python scripts/run_agentic_rag.py \
+  --chunks-path data/processed/chunks_qa_300k.jsonl \
+  --use-milvus \
+  --collection-name ip_chunks_qa_300k \
+  --pipeline-mode agentic \
+  --retrieval-mode hybrid_rerank \
+  --reranker-provider lexical \
+  --candidate-k 50 \
+  --top-k 8 \
+  --query "What trademark and patent risks should a seller consider for a smart travel bag product?" \
+  --use-llm \
+  --show-trace
+```
+
+Interactive chat:
+
+```bash
+python scripts/chat_agentic_rag.py \
+  --chunks-path data/processed/chunks_qa_300k.jsonl \
+  --use-milvus \
+  --collection-name ip_chunks_qa_300k \
+  --pipeline-mode agentic \
+  --retrieval-mode hybrid_rerank \
+  --reranker-provider lexical \
+  --candidate-k 50 \
+  --top-k 8 \
+  --use-llm \
+  --show-sources \
+  --show-trace
+```
+
+Agent vs basic evaluation:
+
+```bash
+python scripts/eval_agent_vs_basic.py \
+  --chunks-path data/processed/chunks_qa_300k.jsonl \
+  --use-milvus \
+  --collection-name ip_chunks_qa_300k \
+  --pipeline-modes basic_rag,agentic \
+  --retrieval-mode hybrid_rerank \
+  --reranker-provider lexical \
+  --candidate-k 50 \
+  --top-k 8 \
+  --output-dir reports/eval_agent_vs_basic
+```
+
+### Phase 5 troubleshooting
+
+Common configuration issues include missing `LLM_API_KEY`, missing `LLM_MODEL`, unsupported `LLM_PROVIDER`, empty LLM choices/content, missing Milvus URI, hybrid mode missing BM25 chunks, hybrid mode missing dense vector store, and local reranker dependency failures. Chat should no longer be slow because runtime construction is reused across questions. No policy evidence is required by default.
