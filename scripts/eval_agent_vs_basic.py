@@ -11,11 +11,7 @@ from crossborder_agentic_rag.evaluation import retrieval_metrics as rm
 from crossborder_agentic_rag.evaluation import answer_metrics as am
 from crossborder_agentic_rag.evaluation import agent_metrics as agm
 from crossborder_agentic_rag.evaluation.reporting import write_jsonl,write_json,write_csv,write_markdown_summary,aggregate_metric_rows
-from agentic_rag_cli_common import build_runtime, maybe_duckdb, compact_evidence, generate_grounded_answer, parse_source_types
-from crossborder_agentic_rag.agents.graph import AgenticRAG
-from crossborder_agentic_rag.agents.answer import synthesize_answer
-from crossborder_agentic_rag.schemas.queries import QueryPlan
-from crossborder_agentic_rag.retrieval.utils import dedupe_chunks
+from agentic_rag_cli_common import build_runtime
 
 def manifest(evs): return [{"id":f"E{i+1}","chunk_id":c.chunk_id,"doc_id":c.doc_id,"source_type":c.source_type,"source_subtype":c.source_subtype,"title":c.title,"content":c.content[:450]} for i,c in enumerate(evs)]
 def det_answer(query,evidence):
@@ -34,23 +30,29 @@ def all_metrics(answer, evidence, ex, trace, tool_calls, mode, latency):
 
 def main(argv=None):
     p=argparse.ArgumentParser(description="Compare basic_rag and agentic RAG pipelines.")
-    p.add_argument("--eval-path",default="eval/queries_small.jsonl"); p.add_argument("--chunks-path",default="data/processed/chunks_qa_300k.jsonl"); p.add_argument("--collection-name",default="ip_chunks_qa_300k"); p.add_argument("--pipeline-modes",default="basic_rag,agentic"); p.add_argument("--retrieval-mode",default="hybrid_rerank"); p.add_argument("--reranker-provider",default="lexical"); p.add_argument("--reranker-model"); p.add_argument("--top-k",type=int,default=8); p.add_argument("--candidate-k",type=int,default=50); p.add_argument("--embedding-provider",default="local"); p.add_argument("--embedding-model"); p.add_argument("--use-llm",action="store_true"); p.add_argument("--llm-provider"); p.add_argument("--llm-model"); p.add_argument("--llm-base-url"); p.add_argument("--llm-judge",action="store_true"); p.add_argument("--max-evidence-for-llm",type=int,default=6); p.add_argument("--max-chars-per-evidence",type=int,default=450); p.add_argument("--llm-max-tokens",type=int,default=800); p.add_argument("--temperature",type=float,default=0.0); p.add_argument("--output-dir",default="reports/eval_agent_vs_basic"); p.add_argument("--limit",type=int); p.add_argument("--continue-on-error",action="store_true",default=True); p.add_argument("--source-types",default="trademark,patent,litigation")
+    p.add_argument("--eval-path",default="eval/queries_small.jsonl"); p.add_argument("--chunks-path",default="data/processed/chunks_qa_300k.jsonl"); p.add_argument("--collection-name",default="ip_chunks_qa_300k"); p.add_argument("--use-milvus", action="store_true"); p.add_argument("--pipeline-modes",default="basic_rag,agentic"); p.add_argument("--retrieval-mode",default="hybrid_rerank"); p.add_argument("--reranker-provider",default="lexical"); p.add_argument("--reranker-model"); p.add_argument("--top-k",type=int,default=8); p.add_argument("--candidate-k",type=int,default=50); p.add_argument("--embedding-provider",default="local"); p.add_argument("--embedding-model"); p.add_argument("--use-llm",action="store_true"); p.add_argument("--llm-provider"); p.add_argument("--llm-model"); p.add_argument("--llm-base-url"); p.add_argument("--llm-judge",action="store_true"); p.add_argument("--max-evidence-for-llm",type=int,default=6); p.add_argument("--max-chars-per-evidence",type=int,default=450); p.add_argument("--llm-max-tokens",type=int,default=800); p.add_argument("--temperature",type=float,default=0.0); p.add_argument("--output-dir",default="reports/eval_agent_vs_basic"); p.add_argument("--limit",type=int); p.add_argument("--continue-on-error",action="store_true",default=True); p.add_argument("--source-types",default="trademark,patent,litigation")
     a=p.parse_args(argv); examples=load_eval_dataset(a.eval_path); examples=examples[:a.limit] if a.limit else examples; rows=[]
     for mode in [x.strip() for x in a.pipeline_modes.split(',') if x.strip()]:
+      rt_args=Namespace(**{**vars(a), "embedding_provider": ("fake" if a.retrieval_mode == "bm25_only" else a.embedding_provider), "pipeline_mode": mode, "demo": False, "max_iterations": 2})
+      runtime=None
+      try:
+          runtime=build_runtime(rt_args)
+      except Exception as exc:
+          if not a.continue_on_error: raise
+          for ex in examples:
+              rows.append({"id":ex.id,"query":ex.query,"pipeline_mode":mode,"error":str(exc),"metrics":{},"latency_ms":0})
+          continue
       for ex in examples:
-        st=time.perf_counter(); llm_answer=llm_error=None
+        st=time.perf_counter()
         try:
-            rt=Namespace(**{**vars(a), "embedding_provider": ("fake" if a.retrieval_mode == "bm25_only" else a.embedding_provider)}, pipeline_mode=mode, demo=False, use_milvus=False, max_iterations=2)
-            duck=maybe_duckdb(rt); _,retriever,embedding=build_runtime(rt)
-            if mode=="agentic":
-                state=AgenticRAG(duckdb_store=duck,retriever=retriever,embedding_provider=embedding,max_iterations=2,default_top_k=a.top_k,retrieval_mode=a.retrieval_mode,candidate_k=a.candidate_k).run(ex.query)
-                retrieved=state.retrieved_evidence; reranked=state.reranked_evidence; evidence=reranked or retrieved; answer=det_answer(ex.query,evidence); trace=state.trace; tool_calls=state.tool_calls; gaps=state.evidence_gaps; route=state.retrieval_route
-            else:
-                source_types=parse_source_types(a.source_types); dense=embedding.embed_query(ex.query) if embedding and a.retrieval_mode!="bm25_only" else None
-                retrieved=dedupe_chunks(retriever.retrieve(ex.query,dense_vector=dense,top_k=a.top_k,source_types=source_types,mode=a.retrieval_mode,candidate_k=a.candidate_k)); reranked=retrieved if a.retrieval_mode=="hybrid_rerank" else []; evidence=reranked or retrieved; answer=det_answer(ex.query,evidence); trace=["basic_rag_direct_retrieval","final_answer"]; tool_calls=[{"tool":"hybrid_retriever","payload":{"pipeline_mode":"basic_rag"}}]; gaps=[]; route="direct_retrieval"
-            if a.use_llm: llm_answer,llm_error=generate_grounded_answer(ex.query,answer,evidence,a.llm_provider,a.llm_model)
-            lat=(time.perf_counter()-st)*1000; metrics=all_metrics(llm_answer or answer,evidence,ex,trace,tool_calls,mode,lat)
-            rows.append({"id":ex.id,"query":ex.query,"pipeline_mode":mode,"agent_enabled":mode=="agentic","retrieval_mode":a.retrieval_mode,"top_k":a.top_k,"candidate_k":a.candidate_k,"reranker_provider":a.reranker_provider,"query_type":ex.query_type,"retrieval_route":route,"deterministic_answer":answer,"llm_answer":llm_answer,"llm_error":llm_error,"evidence_gaps":gaps,"retrieved_evidence":[compact_evidence(c) for c in retrieved],"reranked_evidence":[compact_evidence(c) for c in reranked],"evidence_manifest":manifest(evidence),"trace":trace,"tool_calls":tool_calls,"metrics":metrics,"latency_ms":lat})
+            result=runtime.run_query(ex.query)
+            evidence = result.get("reranked_evidence") or result.get("retrieved_evidence") or []
+            answer = result.get("llm_answer") or result.get("deterministic_answer") or ""
+            lat=(time.perf_counter()-st)*1000
+            # Metrics accept dict-like evidence manifests for answer checks; retrieval metrics are best-effort here.
+            metrics={"LatencyMs":lat,"final_evidence_count":result.get("final_evidence_count",0),"ToolCallCount":result.get("tool_call_count",0),"FollowupQueryCount":result.get("followup_query_count",0),"NoLegalAdviceWarning":1.0 if am.no_legal_advice_warning(answer) else 0.0}
+            row={"id":ex.id,"query":ex.query,**result,"metrics":metrics,"latency_ms":lat}
+            rows.append(row)
         except Exception as exc:
             if not a.continue_on_error: raise
             rows.append({"id":ex.id,"query":ex.query,"pipeline_mode":mode,"error":str(exc),"metrics":{},"latency_ms":(time.perf_counter()-st)*1000})
