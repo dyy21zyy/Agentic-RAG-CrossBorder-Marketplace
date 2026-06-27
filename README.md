@@ -457,3 +457,94 @@ python scripts/run_hybrid_query.py \
 ### Legal disclaimer
 
 This system supports retrieval and compliance research, but it is not legal advice.
+
+## Phase 4: Evaluation and agent-vs-basic experiments
+
+Phase 4 adds a reproducible evaluation framework for the experimental question: **does Agentic RAG improve retrieval and grounded answering compared with a non-agent basic RAG baseline?** The controlled comparison keeps the query set, chunks, collection name, retrieval mode, reranker, `top_k`, `candidate_k`, and optional LLM settings fixed; only the pipeline differs:
+
+- `basic_rag`: direct retrieval baseline without classification, planning, evidence evaluation, or follow-up retrieval.
+- `agentic`: normalize → classify → plan → retrieve → evaluate evidence → optional follow-up retrieval → rerank → answer.
+
+The tracked weak-label example dataset lives at `eval/queries_small.jsonl` so it is not hidden by ignored `data/` artifacts. It focuses on trademark, patent, and litigation evidence only; policy evidence is not required by default.
+
+### Retrieval evaluation
+
+```bash
+python scripts/eval_retrieval.py \
+  --eval-path eval/queries_small.jsonl \
+  --chunks-path data/processed/chunks_qa_300k.jsonl \
+  --modes bm25_only,hybrid_rrf,hybrid_rerank \
+  --top-k-values 5,8,10 \
+  --candidate-k 50 \
+  --reranker-provider lexical \
+  --output-dir reports/eval_retrieval
+```
+
+This writes `retrieval_results.jsonl`, `retrieval_summary.json`, `retrieval_summary.csv`, and `retrieval_summary.md`. `bm25_only` runs without Milvus; dense and hybrid modes require a configured vector backend for real experiments.
+
+### Agentic vs non-agent baseline without LLM
+
+```bash
+python scripts/eval_agent_vs_basic.py \
+  --eval-path eval/queries_small.jsonl \
+  --pipeline-modes basic_rag,agentic \
+  --retrieval-mode hybrid_rerank \
+  --reranker-provider lexical \
+  --candidate-k 50 \
+  --top-k 8 \
+  --output-dir reports/eval_agent_vs_basic_no_llm
+```
+
+### Agentic vs non-agent baseline with LLM
+
+```bash
+python scripts/eval_agent_vs_basic.py \
+  --eval-path eval/queries_small.jsonl \
+  --pipeline-modes basic_rag,agentic \
+  --retrieval-mode hybrid_rerank \
+  --reranker-provider lexical \
+  --candidate-k 50 \
+  --top-k 8 \
+  --use-llm \
+  --output-dir reports/eval_agent_vs_basic_llm
+```
+
+The script does not hard-code an LLM provider, endpoint, or model. Without `--use-llm`, it uses deterministic grounded template answers so CI and local smoke tests do not require API keys.
+
+### Optional LLM judge
+
+```bash
+python scripts/eval_agent_vs_basic.py \
+  --eval-path eval/queries_small.jsonl \
+  --pipeline-modes basic_rag,agentic \
+  --retrieval-mode hybrid_rerank \
+  --reranker-provider lexical \
+  --candidate-k 50 \
+  --top-k 8 \
+  --use-llm \
+  --llm-judge \
+  --output-dir reports/eval_agent_vs_basic_judge
+```
+
+The LLM judge is optional and must return strict JSON scores for faithfulness, answer relevance, citation correctness, and completeness. Judge failures are recorded instead of failing the whole run.
+
+### Compare runs
+
+```bash
+python scripts/compare_eval_runs.py \
+  --inputs reports/eval_agent_vs_basic_no_llm/agent_vs_basic_summary.json reports/eval_agent_vs_basic_llm/agent_vs_basic_summary.json \
+  --labels no_llm,llm \
+  --output-dir reports/comparisons
+```
+
+### Metric meanings and caveats
+
+- `Precision@k`, `Recall@k`, `HitRate@k`, `MRR@k`, and `nDCG@k` measure retrieval ranking quality. When strong relevant document or chunk IDs are absent, weak relevance uses expected source types plus `must_contain_any` terms; missing labels return `None` and are ignored in averages.
+- `CitationCoverage` measures how much final evidence is cited at least once.
+- `ValidCitationRate` measures whether cited `[E#]` identifiers exist in the evidence manifest.
+- `GroundedCitationRate` is a token-overlap proxy for cited sentence support.
+- `FaithfulnessProxy` and `AnswerRelevanceProxy` are heuristic metrics useful for development comparisons, but they are not substitutes for human or legal review.
+- `TraceCompleteness`, `ToolCallCount`, `FollowupQueryCount`, and `AgenticProcessValid` measure whether the observed process matches the expected basic or agentic workflow.
+- `LatencyMs` and output count metrics help compare efficiency and cost tradeoffs.
+
+This system is not legal advice, and evaluation outputs should not be treated as legal conclusions.

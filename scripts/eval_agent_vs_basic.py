@@ -1,0 +1,63 @@
+#!/usr/bin/env python
+from __future__ import annotations
+import argparse, sys, time
+from pathlib import Path
+ROOT=Path(__file__).resolve().parents[1]
+if str(ROOT/"src") not in sys.path: sys.path.insert(0,str(ROOT/"src"))
+if str(ROOT/"scripts") not in sys.path: sys.path.insert(0,str(ROOT/"scripts"))
+from argparse import Namespace
+from crossborder_agentic_rag.evaluation.dataset import load_eval_dataset
+from crossborder_agentic_rag.evaluation import retrieval_metrics as rm
+from crossborder_agentic_rag.evaluation import answer_metrics as am
+from crossborder_agentic_rag.evaluation import agent_metrics as agm
+from crossborder_agentic_rag.evaluation.reporting import write_jsonl,write_json,write_csv,write_markdown_summary,aggregate_metric_rows
+from agentic_rag_cli_common import build_runtime, maybe_duckdb, compact_evidence, generate_grounded_answer, parse_source_types
+from crossborder_agentic_rag.agents.graph import AgenticRAG
+from crossborder_agentic_rag.agents.answer import synthesize_answer
+from crossborder_agentic_rag.schemas.queries import QueryPlan
+from crossborder_agentic_rag.retrieval.utils import dedupe_chunks
+
+def manifest(evs): return [{"id":f"E{i+1}","chunk_id":c.chunk_id,"doc_id":c.doc_id,"source_type":c.source_type,"source_subtype":c.source_subtype,"title":c.title,"content":c.content[:450]} for i,c in enumerate(evs)]
+def det_answer(query,evidence):
+    cites=" ".join(f"[E{i+1}]" for i,_ in enumerate(evidence[:3]))
+    base=f"Evidence-based summary for '{query}'. {cites}" if evidence else "Insufficient evidence was found."
+    return base+" This is not legal advice; consult qualified counsel."
+def retrieval_metric_map(hits,ex):
+    out={}
+    for k in [5,8]:
+        out[f"Precision@{k}"]=rm.precision_at_k(hits,ex,k); out[f"Recall@{k}"]=rm.recall_at_k(hits,ex,k); out[f"HitRate@{k}"]=rm.hit_rate_at_k(hits,ex,k); out[f"MRR@{k}"]=rm.mrr_at_k(hits,ex,k); out[f"nDCG@{k}"]=rm.ndcg_at_k(hits,ex,k)
+    out["SourceTypeCoverage@8"]=rm.source_type_coverage(hits,ex.expected_source_types,8); return out
+def all_metrics(answer, evidence, ex, trace, tool_calls, mode, latency):
+    em=manifest(evidence); m=retrieval_metric_map(evidence,ex)
+    m.update({"CitationCoverage":am.citation_coverage(answer,em),"ValidCitationRate":am.valid_citation_rate(answer,em),"GroundedCitationRate":am.grounded_citation_rate(answer,em),"FaithfulnessProxy":am.faithfulness_proxy(answer,em),"AnswerRelevanceProxy":am.answer_relevance_proxy(answer,ex),"MissingEvidenceMentioned":1.0 if am.missing_evidence_mentioned(answer,[]) else 0.0,"NoLegalAdviceWarning":1.0 if am.no_legal_advice_warning(answer) else 0.0,"TraceCompleteness":agm.trace_completeness_score(trace,mode),"ToolCallCount":agm.tool_call_count(tool_calls),"FollowupQueryCount":agm.followup_query_count(tool_calls),"UsedFollowupRetrieval":1.0 if agm.used_followup_retrieval(trace,tool_calls) else 0.0,"AgenticProcessValid":1.0 if agm.agentic_process_valid(trace,tool_calls,mode) else 0.0,"LatencyMs":latency,"final_evidence_count":len(evidence)})
+    return m
+
+def main(argv=None):
+    p=argparse.ArgumentParser(description="Compare basic_rag and agentic RAG pipelines.")
+    p.add_argument("--eval-path",default="eval/queries_small.jsonl"); p.add_argument("--chunks-path",default="data/processed/chunks_qa_300k.jsonl"); p.add_argument("--collection-name",default="ip_chunks_qa_300k"); p.add_argument("--pipeline-modes",default="basic_rag,agentic"); p.add_argument("--retrieval-mode",default="hybrid_rerank"); p.add_argument("--reranker-provider",default="lexical"); p.add_argument("--reranker-model"); p.add_argument("--top-k",type=int,default=8); p.add_argument("--candidate-k",type=int,default=50); p.add_argument("--embedding-provider",default="local"); p.add_argument("--embedding-model"); p.add_argument("--use-llm",action="store_true"); p.add_argument("--llm-provider"); p.add_argument("--llm-model"); p.add_argument("--llm-base-url"); p.add_argument("--llm-judge",action="store_true"); p.add_argument("--max-evidence-for-llm",type=int,default=6); p.add_argument("--max-chars-per-evidence",type=int,default=450); p.add_argument("--llm-max-tokens",type=int,default=800); p.add_argument("--temperature",type=float,default=0.0); p.add_argument("--output-dir",default="reports/eval_agent_vs_basic"); p.add_argument("--limit",type=int); p.add_argument("--continue-on-error",action="store_true",default=True); p.add_argument("--source-types",default="trademark,patent,litigation")
+    a=p.parse_args(argv); examples=load_eval_dataset(a.eval_path); examples=examples[:a.limit] if a.limit else examples; rows=[]
+    for mode in [x.strip() for x in a.pipeline_modes.split(',') if x.strip()]:
+      for ex in examples:
+        st=time.perf_counter(); llm_answer=llm_error=None
+        try:
+            rt=Namespace(**{**vars(a), "embedding_provider": ("fake" if a.retrieval_mode == "bm25_only" else a.embedding_provider)}, pipeline_mode=mode, demo=False, use_milvus=False, max_iterations=2)
+            duck=maybe_duckdb(rt); _,retriever,embedding=build_runtime(rt)
+            if mode=="agentic":
+                state=AgenticRAG(duckdb_store=duck,retriever=retriever,embedding_provider=embedding,max_iterations=2,default_top_k=a.top_k,retrieval_mode=a.retrieval_mode,candidate_k=a.candidate_k).run(ex.query)
+                retrieved=state.retrieved_evidence; reranked=state.reranked_evidence; evidence=reranked or retrieved; answer=det_answer(ex.query,evidence); trace=state.trace; tool_calls=state.tool_calls; gaps=state.evidence_gaps; route=state.retrieval_route
+            else:
+                source_types=parse_source_types(a.source_types); dense=embedding.embed_query(ex.query) if embedding and a.retrieval_mode!="bm25_only" else None
+                retrieved=dedupe_chunks(retriever.retrieve(ex.query,dense_vector=dense,top_k=a.top_k,source_types=source_types,mode=a.retrieval_mode,candidate_k=a.candidate_k)); reranked=retrieved if a.retrieval_mode=="hybrid_rerank" else []; evidence=reranked or retrieved; answer=det_answer(ex.query,evidence); trace=["basic_rag_direct_retrieval","final_answer"]; tool_calls=[{"tool":"hybrid_retriever","payload":{"pipeline_mode":"basic_rag"}}]; gaps=[]; route="direct_retrieval"
+            if a.use_llm: llm_answer,llm_error=generate_grounded_answer(ex.query,answer,evidence,a.llm_provider,a.llm_model)
+            lat=(time.perf_counter()-st)*1000; metrics=all_metrics(llm_answer or answer,evidence,ex,trace,tool_calls,mode,lat)
+            rows.append({"id":ex.id,"query":ex.query,"pipeline_mode":mode,"agent_enabled":mode=="agentic","retrieval_mode":a.retrieval_mode,"top_k":a.top_k,"candidate_k":a.candidate_k,"reranker_provider":a.reranker_provider,"query_type":ex.query_type,"retrieval_route":route,"deterministic_answer":answer,"llm_answer":llm_answer,"llm_error":llm_error,"evidence_gaps":gaps,"retrieved_evidence":[compact_evidence(c) for c in retrieved],"reranked_evidence":[compact_evidence(c) for c in reranked],"evidence_manifest":manifest(evidence),"trace":trace,"tool_calls":tool_calls,"metrics":metrics,"latency_ms":lat})
+        except Exception as exc:
+            if not a.continue_on_error: raise
+            rows.append({"id":ex.id,"query":ex.query,"pipeline_mode":mode,"error":str(exc),"metrics":{},"latency_ms":(time.perf_counter()-st)*1000})
+    out=Path(a.output_dir); write_jsonl(out/"agent_vs_basic_results.jsonl",rows); groups=aggregate_metric_rows(rows,"pipeline_mode")
+    comp=[]; b=groups.get("basic_rag",{}); ag=groups.get("agentic",{})
+    for metric in sorted(set(b)|set(ag)):
+        bv=b.get(metric,{}).get("mean") if isinstance(b.get(metric),dict) else None; av=ag.get(metric,{}).get("mean") if isinstance(ag.get(metric),dict) else None
+        if bv is not None or av is not None: comp.append({"metric":metric,"basic_rag":bv,"agentic":av,"delta":(av-bv) if isinstance(av,(int,float)) and isinstance(bv,(int,float)) else None})
+    summary={"run_config":vars(a),"groups":groups,"comparison":comp}; write_json(out/"agent_vs_basic_summary.json",summary); write_csv(out/"agent_vs_basic_summary.csv",comp); write_markdown_summary(out/"agent_vs_basic_summary.md",summary)
+if __name__=="__main__": main()
