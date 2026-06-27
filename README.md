@@ -399,7 +399,50 @@ python scripts/run_hybrid_query.py \
   --output-json
 ```
 
-Hybrid modes combine local BM25 with dense Milvus results and include compact hit previews plus `source_type_counts` and `source_subtype_counts` in JSON output. Phase 1 accepts `--candidate-k` for `hybrid_rerank`, but full reranker candidate-pool logic is intentionally deferred to Phase 2.
+Hybrid modes combine local BM25 with dense Milvus results and include compact hit previews plus `source_type_counts` and `source_subtype_counts` in JSON output.
+
+### Phase 2: Hybrid reranking
+
+`hybrid_rerank` now uses a real two-stage candidate pool:
+
+BM25 top `candidate_k` + Dense top `candidate_k` → RRF fusion top `candidate_k` → de-duplication → reranker → final top `top_k` evidence.
+
+`candidate_k` controls the candidate pool before reranking. `top_k` controls the final evidence count passed to deterministic answer synthesis. The `lexical` reranker is dependency-free and useful for smoke tests. The `local` cross-encoder reranker requires `sentence-transformers` and a working `torch` installation. This system supports retrieval and compliance research, but it is still not legal advice.
+
+Hybrid RRF baseline:
+
+```bash
+python scripts/run_hybrid_query.py \
+  --query "What trademark and patent risks should a seller consider for a smart travel bag product?" \
+  --mode hybrid_rrf \
+  --top-k 8 \
+  --output-json
+```
+
+Hybrid rerank with the lexical reranker:
+
+```bash
+python scripts/run_hybrid_query.py \
+  --query "What trademark and patent risks should a seller consider for a smart travel bag product?" \
+  --mode hybrid_rerank \
+  --reranker-provider lexical \
+  --candidate-k 50 \
+  --top-k 8 \
+  --output-json
+```
+
+Hybrid rerank with a local cross-encoder:
+
+```bash
+python scripts/run_hybrid_query.py \
+  --query "What trademark and patent risks should a seller consider for a smart travel bag product?" \
+  --mode hybrid_rerank \
+  --reranker-provider local \
+  --reranker-model BAAI/bge-reranker-base \
+  --candidate-k 50 \
+  --top-k 8 \
+  --output-json
+```
 
 ### Troubleshooting
 

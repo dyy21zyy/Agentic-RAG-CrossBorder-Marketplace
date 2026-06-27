@@ -12,7 +12,7 @@ from crossborder_agentic_rag.retrieval.utils import dedupe_chunks, evidence_to_d
 
 def get_milvus_uri() -> str | None: return os.getenv("RAG_MILVUS_URI") or os.getenv("MILVUS_URI")
 def parse_args():
-    p=argparse.ArgumentParser(description=__doc__); p.add_argument("--query", required=True); p.add_argument("--chunks-path", default="data/processed/chunks_qa_300k.jsonl"); p.add_argument("--collection-name", default="ip_chunks_qa_300k"); p.add_argument("--mode", choices=["bm25_only","dense_only","hybrid_rrf","hybrid_rerank"], default="hybrid_rrf"); p.add_argument("--top-k", type=int, default=10); p.add_argument("--candidate-k", type=int, default=50); p.add_argument("--embedding-provider", default=os.getenv("EMBEDDING_PROVIDER","local")); p.add_argument("--embedding-model"); p.add_argument("--reranker-provider", default=os.getenv("RERANKER_PROVIDER","noop")); p.add_argument("--reranker-model"); p.add_argument("--output-json", action="store_true"); p.add_argument("--preview-chars", type=int, default=500); return p.parse_args()
+    p=argparse.ArgumentParser(description=__doc__); p.add_argument("--query", required=True); p.add_argument("--chunks-path", default="data/processed/chunks_qa_300k.jsonl"); p.add_argument("--collection-name", default="ip_chunks_qa_300k"); p.add_argument("--mode", choices=["bm25_only","dense_only","hybrid_rrf","hybrid_rerank"], default="hybrid_rrf"); p.add_argument("--top-k", type=int, default=10); p.add_argument("--candidate-k", type=int, default=50); p.add_argument("--embedding-provider", default=os.getenv("EMBEDDING_PROVIDER","local")); p.add_argument("--embedding-model"); p.add_argument("--reranker-provider", choices=["noop","none","lexical","local","cross_encoder","cross-encoder"], default=os.getenv("RERANKER_PROVIDER","noop")); p.add_argument("--reranker-model"); p.add_argument("--output-json", action="store_true"); p.add_argument("--preview-chars", type=int, default=500); return p.parse_args()
 def build_output(args,hits):
     counts=summarize_source_counts(hits)
     return {"query":args.query,"mode":args.mode,"collection_name":args.collection_name,"chunks_path":args.chunks_path,"top_k":args.top_k,"candidate_k":args.candidate_k,"reranker_provider":args.reranker_provider,"hits":[evidence_to_dict(c,i+1,args.preview_chars) for i,c in enumerate(hits)],**counts}
@@ -32,11 +32,12 @@ def main() -> int:
     try:
         reranker=build_reranker(args.reranker_provider, args.reranker_model) if args.mode=="hybrid_rerank" else None
         retriever=HybridRetriever(provider,bm25,store,reranker)
-        hits=dedupe_chunks(retriever.retrieve(q, top_k=args.top_k, mode=args.mode))
+        hits=dedupe_chunks(retriever.retrieve(q, top_k=args.top_k, mode=args.mode, candidate_k=args.candidate_k))
+    except ImportError as exc: print(f"Reranker initialization failed: {exc}", file=sys.stderr); return 1
     except Exception as exc: print(f"Hybrid retrieval failed: {exc}", file=sys.stderr); return 1
     out=build_output(args,hits)
     if args.output_json: print(json.dumps(out, ensure_ascii=False, indent=2)); return 0
-    print(f"Query: {q}\nMode: {args.mode}\nHits: {len(hits)}")
-    for h in out["hits"]: print(f"\n[{h['rank']}] {h['title']} score={h['score']}\n{h['content_preview']}")
+    print(f"Query: {q}\nMode: {args.mode}\nTop k: {args.top_k}\nCandidate k: {args.candidate_k}\nReranker provider: {args.reranker_provider}\nHits: {len(hits)}")
+    for h in out["hits"]: print(f"\n[{h['rank']}] {h['title']} score={h['score']} source_type={h['source_type']}\n{h['content_preview']}")
     return 0
 if __name__ == "__main__": raise SystemExit(main())
