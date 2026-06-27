@@ -130,3 +130,39 @@ def test_jsonl_roundtrip(tmp_path):
     out = tmp_path / "docs.jsonl"
     assert write_documents_jsonl(docs, out) == len(docs)
     assert read_documents_jsonl(out) == docs
+
+
+def test_trademark_goods_services_sources_merge_without_duplicates(tmp_path):
+    xml = tmp_path / "tm.xml"
+    xml.write_text("""<case-file><serial-number>1</serial-number><mark-identification>MERGE</mark-identification><case-file-statement><type-code>GS009</type-code><text>Automobiles</text></case-file-statement><goods-services>Automobiles</goods-services><identification-of-goods>Parts</identification-of-goods></case-file>""", encoding="utf-8")
+    docs, report = parse_trademark_xml_directory(tmp_path)
+    assert report["failed_files"] == []
+    assert docs[0].metadata["goods_services"] == ["Automobiles", "Parts"]
+
+
+def test_patent_claim_metadata_preserved(tmp_path):
+    p = tmp_path / "claims.tsv"
+    p.write_text("patent_id\tclaim_number\tclaim_type\tclaim_text\tis_independent\nUS2\t1\tindependent\tA widget claim.\ttrue\n", encoding="utf-8")
+    docs, report = parse_patent_tsv_directory(tmp_path)
+    assert report["warnings"] == []
+    assert docs[0].metadata["claim_number"] == "1"
+    assert docs[0].metadata["claim_type"] == "independent"
+    assert docs[0].metadata["is_independent"] is True
+    assert "Patent ID: US2" in docs[0].content and "A widget claim" in docs[0].content
+
+
+def test_patent_empty_text_skipped_with_warning(tmp_path):
+    p = tmp_path / "empty.tsv"
+    p.write_text("patent_id\ttitle\nUS3\t\n", encoding="utf-8")
+    docs, report = parse_patent_tsv_directory(tmp_path)
+    assert docs == []
+    assert report["warnings"]
+
+
+def test_litigation_minimal_variant_csv_parses(tmp_path):
+    p = tmp_path / "cases.csv"
+    p.write_text("docket_number,district_court,filing_date,plaintiff,defendant,asserted_patent,description\n2:25-cv-1,D. Del.,2025-01-02,A Corp,B LLC,US9,Patent suit\n", encoding="utf-8")
+    docs, report = parse_litigation_csv_directory(tmp_path)
+    assert len(docs) == 1
+    assert report["warnings"]
+    assert "2:25-cv-1" in docs[0].content and "D. Del." in docs[0].content

@@ -319,3 +319,27 @@ Stages 0-8 are implemented for the MVP staged workflow:
 - Stage 6: Agentic RAG workflow and script 08
 - Stage 7: evaluation, ablation, and scripts 09-10
 - Stage 8: fixture-based end-to-end pipeline and final documentation
+
+## Phase 0: Data ingestion and parser quality
+
+Phase 0 hardens the ingestion/parsing layer before retrieval, reranking, LLM answering, or chat improvements. The current project version focuses on normalized evidence from:
+
+- Trademark records
+- Patent records and claim/long-text records
+- Patent litigation records
+
+Policy corpus ingestion may still exist for compatibility, but policy evidence is not required for default risk analysis in this version. Bad parsing creates incomplete documents, which then create bad chunks, weak retrieval, unreliable reranking, and poor LLM answers.
+
+Example parser and quality-check commands:
+
+```bash
+python scripts/01_parse_trademark_xml.py --input data/raw/trademarks --output data/processed/trademarks.jsonl --report data/processed/trademark_report.json
+python scripts/02_parse_patent_tsv.py --input data/raw/patents --output data/processed/patents.jsonl --report data/processed/patent_report.json
+python scripts/03_parse_litigation_csv.py --input data/raw/litigation --output data/processed/litigation.jsonl --report data/processed/litigation_report.json
+python scripts/check_ingestion_quality.py \
+  --input data/processed/normalized_docs.jsonl \
+  --require-source-types trademark,patent,litigation
+```
+
+This system supports compliance research and retrieval workflows, but it is not legal advice.
+

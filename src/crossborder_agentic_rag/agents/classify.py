@@ -36,7 +36,9 @@ def classify_query(query: str) -> QueryClassification:
     lower = q.lower()
     risk_terms = ["risk", "listing risk", "compliance risk", "can this product be sold", "can i sell", "should i list", "does this listing violate policy", "could this listing infringe", "ip risk assessment", "counterfeit risk", "infringement risk"]
     if _has(lower, *risk_terms):
-        sources = ["policy"]
+        sources = []
+        if _has(lower, "marketplace policy", "platform policy", "temu policy", "temu"):
+            sources.append("policy")
         if _has(lower, "mercedes", "logo", "brand", "trademark", "mark"):
             sources.append("trademark")
         if _has(lower, "patent", "claim", "invention"):

@@ -23,9 +23,9 @@ def synthesize_answer(plan: QueryPlan, sql_results: list[dict[str, Any]], eviden
     gaps=evidence_gaps or []
     t=plan.expected_answer_type
     if t=="risk_analysis":
-        text=" ".join(c.content.lower() for c in evidence); has_policy=any(c.source_type=="policy" for c in evidence); has_other=bool(sql_results) or any(c.source_type in {"trademark","patent","litigation"} for c in evidence)
-        level="Insufficient Evidence" if gaps or not (has_policy and has_other) else ("High" if any(w in text for w in ["counterfeit","remove","removal","suspend"]) else "Medium")
-        parts=[f"Risk Level: {level}", "Rationale", "- Based on the gathered policy and IP evidence." if citations else "- Evidence is missing.", "Mitigation Suggestions", "- Verify authorization/licensing and avoid using protected marks or patented features without rights.", "Evidence Used", *( _line(c) for c in evidence[:5]), "Citations", *(citations or ["Evidence is missing."])]
+        text=" ".join(c.content.lower() for c in evidence); has_other=bool(sql_results) or any(c.source_type in {"trademark","patent","litigation"} for c in evidence)
+        level="Insufficient Evidence" if gaps or not has_other else ("High" if any(w in text for w in ["counterfeit","remove","removal","suspend"]) else "Medium")
+        parts=[f"Risk Level: {level}", "Rationale", "- Based on the gathered trademark, patent, and litigation evidence." if citations else "- Evidence is missing.", "Mitigation Suggestions", "- Verify authorization/licensing and avoid using protected marks or patented features without rights.", "Evidence Used", *( _line(c) for c in evidence[:5]), "Citations", *(citations or ["Evidence is missing."])]
         return "\n".join(parts), citations
     headings={"direct_field_answer":"Structured Results","policy_answer":"Relevant Policy Evidence","patent_explanation":"Relevant Patent Evidence","trademark_explanation":"Relevant Trademark Evidence","litigation_summary":"Case / Litigation Evidence","comparison_answer":"Comparison Points","general_answer":"Evidence"}
     parts=["Answer", f"- Query: {plan.query}", headings.get(t,"Evidence")]

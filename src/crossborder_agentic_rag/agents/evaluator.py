@@ -26,7 +26,8 @@ def evaluate_evidence(plan: QueryPlan, evidence: list[EvidenceChunk], sql_result
     elif t=="trademark_explanation" and not (_has(evidence,"trademark") or _sql_has(sql_results,"trademark")): missing.append("trademark")
     elif t=="litigation_summary" and not (_has(evidence,"litigation") or _sql_has(sql_results,"litigation")): missing.append("litigation")
     elif t=="risk_analysis":
-        if not _has(evidence,"policy"): missing.append("policy")
+        if "policy" in plan.source_types and "policy" in plan.query.lower() and not _has(evidence,"policy"):
+            missing.append("policy")
         if not (_has(evidence,"trademark") or _has(evidence,"patent") or _has(evidence,"litigation") or sql_results):
             for st in ["trademark","patent","litigation"]:
                 if st in plan.source_types or not plan.source_types: missing.append(st); break
