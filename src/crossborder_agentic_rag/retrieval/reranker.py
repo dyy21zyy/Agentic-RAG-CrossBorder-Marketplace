@@ -19,12 +19,14 @@ class LexicalReranker(BaseReranker):
             scored.append((score,i,_copy(c,score)))
         scored.sort(key=lambda x:(-x[0],x[1])); return [c for _,_,c in scored[:top_k]]
 class LocalCrossEncoderReranker(BaseReranker):
+    MESSAGE="sentence-transformers and a working torch installation are required for local cross-encoder reranking. Install the reranker extra and verify torch can import on this machine."
     def __init__(self,model_name:str|None=None)->None:
         try:
             from sentence_transformers import CrossEncoder
-        except ImportError as exc:
-            raise ImportError("sentence-transformers is required for local cross-encoder reranking. Install with: pip install -e '.[reranker]'") from exc
-        self.model_name=model_name or os.getenv("RERANKER_MODEL") or "BAAI/bge-reranker-base"; self.model=CrossEncoder(self.model_name)
+            self.model_name=model_name or os.getenv("RERANKER_MODEL") or "BAAI/bge-reranker-base"
+            self.model=CrossEncoder(self.model_name)
+        except Exception as exc:
+            raise ImportError(self.MESSAGE) from exc
     def rerank(self,query:str,candidates:list[EvidenceChunk],top_k:int)->list[EvidenceChunk]:
         if top_k<=0: return []
         pairs=[(query,c.title+"\n"+c.content) for c in candidates]
@@ -36,10 +38,10 @@ class APIRerankerPlaceholder(BaseReranker):
         self.api_key=os.getenv("RERANKER_API_KEY"); self.api_base=os.getenv("RERANKER_API_BASE"); self.model=os.getenv("RERANKER_MODEL")
     def rerank(self,query:str,candidates:list[EvidenceChunk],top_k:int)->list[EvidenceChunk]:
         raise NotImplementedError("API reranker contract is not implemented in Stage 5; no fake API reranking is performed.")
-def build_reranker(provider:str|None=None)->BaseReranker:
+def build_reranker(provider:str|None=None, model_name:str|None=None)->BaseReranker:
     name=(provider if provider is not None else os.getenv("RERANKER_PROVIDER","noop")).lower().replace("_","-")
     if name=="noop": return NoOpReranker()
     if name=="lexical": return LexicalReranker()
-    if name in {"local","cross-encoder"}: return LocalCrossEncoderReranker()
+    if name in {"local","cross-encoder"}: return LocalCrossEncoderReranker(model_name)
     if name=="api": return APIRerankerPlaceholder()
     raise NotImplementedError(f"Reranker provider '{name}' is not supported.")
