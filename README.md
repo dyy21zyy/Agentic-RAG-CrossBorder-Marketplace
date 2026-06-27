@@ -343,3 +343,74 @@ python scripts/check_ingestion_quality.py \
 
 This system supports compliance research and retrieval workflows, but it is not legal advice.
 
+
+## Phase 1: Runtime CLI and Milvus Lite retrieval
+
+Phase 1 makes runtime retrieval easier to run without pasted Python heredocs. It adds stable CLI entry points for LLM API smoke tests, dense Milvus retrieval, and BM25/dense/hybrid retrieval. The retrieval scripts prefer `RAG_MILVUS_URI` for local Milvus Lite databases and only fall back to `MILVUS_URI` for backward compatibility.
+
+### Environment setup example
+
+```bash
+export RAG_MILVUS_URI=/root/autodl-tmp/Agentic_Rag/data/milvus_qa_300k.db
+export LOCAL_EMBEDDING_MODEL=/root/autodl-tmp/models/bge-small-en-v1.5
+export EMBEDDING_PROVIDER=local
+export OPENAI_BASE_URL=https://api-inference.modelscope.cn/v1
+export LLM_MODEL=deepseek-ai/DeepSeek-V4-Pro
+```
+
+Set `OPENAI_API_KEY` in your shell or secret manager before running the LLM smoke test. Do not commit `.env`, model weights, local database files, or generated output artifacts.
+
+### Test LLM API
+
+```bash
+python scripts/test_llm_api.py
+```
+
+The script prints whether `OPENAI_API_KEY` is set, but it never prints the key. It also prints `OPENAI_BASE_URL`, `LLM_MODEL`, and the final model response. Empty `choices` or empty message content fail clearly.
+
+### Dense query
+
+```bash
+python scripts/run_dense_query.py \
+  --query "Find patent claims related to drone delivery control." \
+  --top-k 10
+```
+
+Dense retrieval requires `RAG_MILVUS_URI` (or legacy `MILVUS_URI`), a collection such as `ip_chunks_qa_300k`, `pymilvus`, and a working embedding provider. Milvus Lite collections are loaded before search so a released collection does not fail with `call load() before search/get/query`.
+
+### BM25-only query without Milvus
+
+```bash
+python scripts/run_hybrid_query.py \
+  --query "smart travel bag trademark risk" \
+  --mode bm25_only \
+  --top-k 10
+```
+
+`bm25_only` reads the chunks JSONL and does not require Milvus, `pymilvus`, embeddings, `torch`, or `sentence-transformers`.
+
+### Hybrid RRF query
+
+```bash
+python scripts/run_hybrid_query.py \
+  --query "What trademark and patent risks should a seller consider for a smart travel bag product?" \
+  --mode hybrid_rrf \
+  --top-k 10 \
+  --output-json
+```
+
+Hybrid modes combine local BM25 with dense Milvus results and include compact hit previews plus `source_type_counts` and `source_subtype_counts` in JSON output. Phase 1 accepts `--candidate-k` for `hybrid_rerank`, but full reranker candidate-pool logic is intentionally deferred to Phase 2.
+
+### Troubleshooting
+
+* **`RAG_MILVUS_URI` missing**: set `export RAG_MILVUS_URI=/path/to/milvus.db`. `MILVUS_URI` is only a backward-compatible fallback.
+* **Milvus Lite collection released**: the runtime store calls `load_collection(collection_name=...)` before search in Lite mode and `collection.load()` in server mode.
+* **Malformed `metadata_json`**: retrieval maps empty metadata to `{}` and malformed metadata to `{ "_metadata_parse_error": true }` instead of crashing.
+* **Optional `pymilvus` missing**: install `pymilvus` for dense/hybrid Milvus retrieval, or run `--mode bm25_only` without Milvus.
+* **Optional `torch`/`sentence-transformers` DLL issue on Windows**: use `RERANKER_PROVIDER=noop` or `lexical` for baseline tests. Local cross-encoder reranking requires both `sentence-transformers` and a working `torch` installation.
+* **LLM API returns empty choices**: verify `OPENAI_API_KEY`, `OPENAI_BASE_URL`, and `LLM_MODEL`, then rerun `python scripts/test_llm_api.py`.
+* **Generated-file safety**: do not commit `data/`, `.env`, model weights, Milvus `.db` files, archives, or output artifacts.
+
+### Legal disclaimer
+
+This system supports retrieval and compliance research, but it is not legal advice.

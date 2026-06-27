@@ -61,7 +61,7 @@ class LocalSentenceTransformerEmbeddingProvider(BaseEmbeddingProvider):
             from sentence_transformers import SentenceTransformer
         except ImportError as exc:
             raise ImportError("sentence-transformers is required for local embeddings. Install with: pip install -e '.[local]'") from exc
-        self.model_name=model_name or os.getenv("EMBEDDING_MODEL") or "BAAI/bge-small-en-v1.5"
+        self.model_name=model_name or os.getenv("LOCAL_EMBEDDING_MODEL") or os.getenv("EMBEDDING_MODEL") or "BAAI/bge-small-en-v1.5"
         self.normalize=normalize; self.model=SentenceTransformer(self.model_name)
     def embed_query(self,text:str)->list[float]: return self.embed_documents([text])[0]
     def embed_documents(self,texts:list[str])->list[list[float]]:
@@ -72,5 +72,5 @@ def build_embedding_provider(provider: str|None=None, dim: int|None=None)->BaseE
     name=(provider if provider is not None else os.getenv("EMBEDDING_PROVIDER","fake")).lower().replace("_","-")
     if name=="fake": return FakeEmbeddingProvider(dim=16 if dim is None else dim)
     if name in {"openai","openai-compatible","api"}: return OpenAICompatibleEmbeddingProvider(dim=dim)
-    if name in {"local","sentence-transformer"}: return LocalSentenceTransformerEmbeddingProvider()
+    if name in {"local","sentence-transformer"}: return LocalSentenceTransformerEmbeddingProvider(os.getenv("LOCAL_EMBEDDING_MODEL") or os.getenv("EMBEDDING_MODEL"))
     raise NotImplementedError(f"Embedding provider '{name}' is not supported.")
