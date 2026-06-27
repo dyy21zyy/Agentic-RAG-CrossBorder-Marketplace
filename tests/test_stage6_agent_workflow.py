@@ -99,3 +99,8 @@ def test_future_stage_scripts_still_raise_not_implemented():
 def test_no_duplicate_module_paths_created():
     for p in ['src/crossborder_agentic_rag/agent','src/crossborder_agentic_rag/rag','src/crossborder_agentic_rag/query_router','src/crossborder_agentic_rag/sql','src/crossborder_agentic_rag/agents/agent_graph.py','src/crossborder_agentic_rag/agents/graph_v2.py']:
         assert not (ROOT/p).exists()
+
+def test_risk_analysis_does_not_require_policy_by_default():
+    c = classify_query('Can I sell a phone case using the MERCEDES logo?')
+    ev = evaluate_evidence(plan('Can I sell a phone case using the MERCEDES logo?'), [chunks()[1]])
+    assert 'Missing policy evidence' not in ev.evidence_gaps
