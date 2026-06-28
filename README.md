@@ -12,31 +12,7 @@ This project is an Agentic RAG system for cross-border marketplace intellectual 
 - patent litigation lookup
 - multi-source IP risk analysis
 
-## What this MVP does
 
-- Parses raw trademark XML, patent TSV, litigation CSV, and policy docs.
-- Normalizes records into JSONL documents.
-- Builds logical `EvidenceChunk` records.
-- Builds a DuckDB structured lookup database.
-- Builds a Milvus vector index in real mode or dry-run mode.
-- Supports local BM25 retrieval.
-- Supports dense retrieval through Milvus.
-- Supports RRF fusion and reranking.
-- Runs a deterministic Agentic RAG workflow.
-- Produces adaptive answers with citations.
-- Runs evaluation and ablation experiments.
-- Includes fixture-based end-to-end tests.
-
-## What this MVP does not do
-
-- It is not legal advice.
-- It does not guarantee infringement determination.
-- It does not include a production web UI.
-- It does not expose an API server.
-- It does not train or fine-tune models.
-- It does not include full OCR/image trademark analysis.
-- It does not use an external LLM judge for faithfulness.
-- It does not automatically download USPTO or PatentsView full datasets.
 
 ## Data sources
 
