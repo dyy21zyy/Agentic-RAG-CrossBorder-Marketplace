@@ -67,8 +67,8 @@ def test_eval_dataset_loader_rejects_invalid_json_with_line_number(tmp_path):
 def _c(cid, doc, st, content): return EvidenceChunk(cid,doc,st,"fixture",st,content,{})
 class FakeAgent:
     def run(self,q):
-        st=AgentState(q); st.retrieval_route="sql" if "Nice" in q else "hybrid"; st.expected_answer_type="direct_field_answer"; st.answer="Class 12" if "Nice" in q else "Temu policy prohibits trademark infringement."
-        ev=[_c("trademark:sn:90000001:trademark_class:12","trademark:sn:90000001","trademark","Class 12 MERCEDES"), _c("policy:temu:ip:trademark","policy:temu:ip","policy","Temu policy prohibits trademark infringement")]
+        st=AgentState(q); st.retrieval_route="sql" if "Nice" in q else "hybrid"; st.expected_answer_type="direct_field_answer"; st.answer="Class 12" if "Nice" in q else "Trademark evidence describes trademark infringement."
+        ev=[_c("trademark:sn:90000001:trademark_class:12","trademark:sn:90000001","trademark","Class 12 MERCEDES"), _c("trademark:brand:ip:trademark","trademark:brand:ip","trademark","Trademark evidence describes trademark infringement")]
         st.reranked_evidence=ev; st.citations=[e.chunk_id for e in ev]; st.trace=["fake"]; return st
 
 def test_evaluate_agent_outputs_per_example_metrics():
@@ -97,7 +97,7 @@ def test_eval_cli_requires_backend_without_demo(tmp_path):
 
 def test_default_ablation_configs_include_required_experiments():
     names={c.name for c in default_ablation_configs()}
-    assert {"bm25_only","hybrid_rrf","hybrid_rerank","no_reranker","without_policy","rrf_k_10","rrf_k_60"} <= names
+    assert {"bm25_only","hybrid_rrf","hybrid_rerank","no_reranker","rrf_k_10","rrf_k_60"} <= names
 
 def test_ablation_runner_changes_config_per_experiment():
     seen=[]
@@ -114,7 +114,7 @@ def test_ablation_report_writer_outputs_json_csv_markdown(tmp_path):
     paths=write_ablation_report_bundle(out,tmp_path); assert all(Path(p).exists() for p in paths.values())
 
 def test_ablation_cli_demo_writes_report_bundle(tmp_path):
-    cp=subprocess.run([sys.executable,"scripts/10_run_ablation.py","--eval-file","tests/fixtures/eval/eval_queries.jsonl","--output-dir",str(tmp_path),"--demo","--experiments","bm25_only,without_policy"],cwd=ROOT,text=True,capture_output=True)
+    cp=subprocess.run([sys.executable,"scripts/10_run_ablation.py","--eval-file","tests/fixtures/eval/eval_queries.jsonl","--output-dir",str(tmp_path),"--demo","--experiments","bm25_only,without_patent"],cwd=ROOT,text=True,capture_output=True)
     assert cp.returncode==0, cp.stderr; assert (tmp_path/"ablation_results.json").exists()
 
 def test_ablation_runner_does_not_write_dummy_all_zero_metrics():

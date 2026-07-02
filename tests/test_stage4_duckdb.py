@@ -137,10 +137,9 @@ def test_duckdb_lookup_litigation_patents_by_case(loaded_store):
     assert store.lookup_litigation_patents_by_case("1:24-cv-00001")[0]["patent"] == "US1234567"
 
 
-def test_duckdb_skips_policy_docs_with_warning(loaded_store):
+def test_duckdb_does_not_skip_supported_docs(loaded_store):
     _, report = loaded_store
-    assert report["documents_skipped"] == 1
-    assert any("policy" in w.lower() for w in report["warnings"])
+    assert report["documents_skipped"] == 0
 
 
 def test_duckdb_row_counts_returns_all_tables(loaded_store):
@@ -153,8 +152,8 @@ def test_duckdb_load_report_contains_counts_warnings_and_failures():
     bad = NormalizedDocument("bad:patent", "patent", "Bad", "", {"patent_id": object()})
     store = DuckDBStore(":memory:")
     report = store.load_documents([good, bad, docs()[-1]])
-    assert report["documents_seen"] == 3 and report["documents_loaded"] == 1
-    assert report["warnings"] and report["failed_documents"]
+    assert report["documents_seen"] == 3 and report["documents_loaded"] == 2
+    assert report["failed_documents"]
     store.close()
 
 

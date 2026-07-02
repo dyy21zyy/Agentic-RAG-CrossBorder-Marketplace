@@ -24,10 +24,10 @@ class AblationResult:
     config: dict[str, Any]
 
 def default_ablation_configs() -> list[AblationConfig]:
-    all_src=["trademark","patent","policy","litigation"]
+    all_src=["trademark","patent","litigation"]
     return [
-        AblationConfig("bm25_only", retrieval_mode="bm25", reranker_provider="none"),
-        AblationConfig("dense_only", retrieval_mode="dense", reranker_provider="none"),
+        AblationConfig("bm25_only", retrieval_mode="bm25_only", reranker_provider="none"),
+        AblationConfig("dense_only", retrieval_mode="dense_only", reranker_provider="none"),
         AblationConfig("hybrid_rrf", retrieval_mode="hybrid_rrf", reranker_provider="none"),
         AblationConfig("hybrid_rerank", retrieval_mode="hybrid_rerank", reranker_provider="lexical"),
         AblationConfig("sql_only", disable_hybrid=True),
@@ -37,7 +37,6 @@ def default_ablation_configs() -> list[AblationConfig]:
         AblationConfig("lexical_reranker", retrieval_mode="hybrid_rerank", reranker_provider="lexical"),
         AblationConfig("without_trademark", source_types=[s for s in all_src if s!="trademark"]),
         AblationConfig("without_patent", source_types=[s for s in all_src if s!="patent"]),
-        AblationConfig("without_policy", source_types=[s for s in all_src if s!="policy"]),
         AblationConfig("without_litigation", source_types=[s for s in all_src if s!="litigation"]),
         AblationConfig("rrf_k_10", retrieval_mode="hybrid_rrf", rrf_k=10),
         AblationConfig("rrf_k_30", retrieval_mode="hybrid_rrf", rrf_k=30),

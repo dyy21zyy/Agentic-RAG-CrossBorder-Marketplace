@@ -44,7 +44,7 @@ def test_end_to_end_fixture_pipeline(tmp_path: Path) -> None:
     run_cmd([sys.executable, "scripts/06_build_duckdb.py", "--input", str(all_docs), "--duckdb-path", str(processed / "ip.duckdb"), "--report", str(processed / "duckdb_report.json"), "--overwrite"])
     run_cmd([sys.executable, "scripts/07_build_milvus_index.py", "--input", str(processed / "chunks.jsonl"), "--dry-run", "--report", str(processed / "milvus_report.json")])
 
-    policy = run_cmd([sys.executable, "scripts/08_run_query_cli.py", "What does Temu policy say about trademark infringement?", "--duckdb-path", str(processed / "ip.duckdb"), "--chunks-path", str(processed / "chunks.jsonl"), "--output-json"])
+    policy = run_cmd([sys.executable, "scripts/08_run_query_cli.py", "Explain trademark infringement", "--duckdb-path", str(processed / "ip.duckdb"), "--chunks-path", str(processed / "chunks.jsonl"), "--output-json"])
     policy_json = json.loads(policy.stdout)
     assert policy_json["answer"]
     assert policy_json["retrieval_route"]
@@ -52,7 +52,7 @@ def test_end_to_end_fixture_pipeline(tmp_path: Path) -> None:
     assert "trace" in policy_json
     assert "Risk Level" not in policy_json["answer"]
 
-    risk = run_cmd([sys.executable, "scripts/08_run_query_cli.py", "Can I sell a phone case using the MERCEDES logo on Temu?", "--duckdb-path", str(processed / "ip.duckdb"), "--chunks-path", str(processed / "chunks.jsonl"), "--output-json"])
+    risk = run_cmd([sys.executable, "scripts/08_run_query_cli.py", "Can I sell a phone case using the MERCEDES logo?", "--duckdb-path", str(processed / "ip.duckdb"), "--chunks-path", str(processed / "chunks.jsonl"), "--output-json"])
     risk_json = json.loads(risk.stdout)
     assert "Risk Level" in risk_json["answer"]
     assert risk_json["retrieval_route"] == "multi_source_risk" or risk_json["query_type"] == "risk_analysis"
@@ -69,7 +69,7 @@ def test_end_to_end_fixture_pipeline(tmp_path: Path) -> None:
     assert load_json(processed / "trademark_report.json")["documents_parsed"] >= 1
     assert load_json(processed / "patent_report.json")["documents_parsed"] >= 1
     assert load_json(processed / "litigation_report.json")["documents_parsed"] >= 1
-    assert load_json(processed / "policy_report.json")["documents_parsed"] >= 1
+    assert load_json(processed / "policy_report.json")["documents_parsed"] == 0
     assert load_json(processed / "chunk_report.json")["chunks_written"] >= 1
     row_counts = load_json(processed / "duckdb_report.json")["row_counts"]
     assert row_counts.get("trademarks", 0) >= 1
@@ -89,7 +89,7 @@ def test_readme_contains_full_pipeline_commands() -> None:
 
 
 def test_no_production_script_uses_empty_retriever_by_default(tmp_path: Path) -> None:
-    query = run_cmd([sys.executable, "scripts/08_run_query_cli.py", "What does Temu policy say?"], check=False)
+    query = run_cmd([sys.executable, "scripts/08_run_query_cli.py", "Explain trademark infringement"], check=False)
     assert query.returncode != 0
     assert any(term in (query.stdout + query.stderr).lower() for term in ["retrieval backend", "chunks path", "milvus", "demo mode"])
     eval_result = run_cmd([sys.executable, "scripts/09_run_eval.py", "--eval-file", str(FIXTURES / "eval" / "eval_queries.jsonl"), "--output-dir", str(tmp_path / "eval_no_backend")], check=False)

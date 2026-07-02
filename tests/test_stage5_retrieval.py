@@ -23,8 +23,8 @@ def test_openai_embedding_rejects_bad_dimension_with_mocked_response(monkeypatch
 def test_local_embedding_missing_dependency_fails_clearly(monkeypatch):
     monkeypatch.setitem(sys.modules,'sentence_transformers',None)
     with pytest.raises(ImportError,match='sentence-transformers'): LocalSentenceTransformerEmbeddingProvider()
-def test_local_bm25_returns_relevant_policy_chunk(): assert LocalBM25Retriever(chunks()).search('Temu trademark infringement removal appeal')[0].chunk_id=='chunk-5'
-def test_local_bm25_supports_source_type_filter(): assert all(c.source_type=='policy' for c in LocalBM25Retriever(chunks()).search('trademark',source_types=['policy']))
+def test_local_bm25_returns_relevant_trademark_chunk(): assert LocalBM25Retriever(chunks()).search('Brand trademark infringement removal appeal')[0].chunk_id=='chunk-5'
+def test_local_bm25_supports_source_type_filter(): assert all(c.source_type=='trademark' for c in LocalBM25Retriever(chunks()).search('trademark',source_types=['trademark']))
 def test_local_bm25_supports_metadata_filter(): assert LocalBM25Retriever(chunks()).search('MERCEDES',filters={'word_mark':'MERCEDES'})[0].source_type=='trademark'
 def test_local_bm25_empty_query_returns_empty_list(): assert LocalBM25Retriever(chunks()).search('')==[]
 def test_rrf_fusion_deduplicates_and_ranks():
@@ -42,18 +42,18 @@ def test_api_reranker_placeholder_does_not_fake_success():
 class V:
     def __init__(self): self.calls=[]
     def dense_search(self,vec,filters=None,top_k=20): self.calls.append((vec,filters,top_k)); return chunks()[2:2+top_k]
-def test_hybrid_retriever_bm25_only(): assert HybridRetriever(bm25_retriever=LocalBM25Retriever(chunks()),vector_store=V()).retrieve('Temu removal',mode='bm25_only')[0].chunk_id=='chunk-5'
+def test_hybrid_retriever_bm25_only(): assert HybridRetriever(bm25_retriever=LocalBM25Retriever(chunks()),vector_store=V()).retrieve('Brand removal',mode='bm25_only')[0].chunk_id=='chunk-5'
 def test_hybrid_retriever_dense_only_with_fake_vector_store(): assert HybridRetriever(vector_store=V()).retrieve('q',dense_vector=[1],mode='dense_only',top_k=1)[0].chunk_id=='chunk-3'
 def test_hybrid_retriever_dense_only_embeds_query_when_vector_missing():
     e=FakeEmbeddingProvider(3); v=V(); HybridRetriever(embedding_provider=e,vector_store=v).retrieve('abc',mode='dense_only'); assert e.query_calls==['abc']
-def test_hybrid_retriever_hybrid_rrf(): assert HybridRetriever(FakeEmbeddingProvider(3),LocalBM25Retriever(chunks()),V()).retrieve('Temu removal',dense_vector=[0],top_k=3)
+def test_hybrid_retriever_hybrid_rrf(): assert HybridRetriever(FakeEmbeddingProvider(3),LocalBM25Retriever(chunks()),V()).retrieve('Brand removal',dense_vector=[0],top_k=3)
 def test_hybrid_retriever_hybrid_rerank(): assert HybridRetriever(FakeEmbeddingProvider(3),LocalBM25Retriever(chunks()),V(),LexicalReranker()).retrieve('patent claim',dense_vector=[0],mode='hybrid_rerank',top_k=2)
 def test_hybrid_retriever_rejects_unknown_mode():
     with pytest.raises(ValueError): HybridRetriever().retrieve('q',mode='x')
 def test_hybrid_retriever_rejects_missing_backends():
     with pytest.raises(ValueError): HybridRetriever().retrieve('q',mode='bm25_only')
 def test_milvus_store_build_filter_expr():
-    s=MilvusChunkStore('u',None,'c',3).build_filter_expr({'source_type':['policy','trademark'],'word_mark':'MER"CEDES'}); assert 'source_type in' in s and '\\"' in s
+    s=MilvusChunkStore('u',None,'c',3).build_filter_expr({'source_type':['trademark','trademark'],'word_mark':'MER"CEDES'}); assert 'source_type in' in s and '\\"' in s
 def test_milvus_store_rejects_invalid_filter_value():
     with pytest.raises(ValueError): MilvusChunkStore('u',None,'c',3).build_filter_expr({'source_type':5})
 def test_milvus_store_insert_validates_vector_count():

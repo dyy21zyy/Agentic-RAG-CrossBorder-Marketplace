@@ -60,10 +60,6 @@ class DuckDBStore:
         by_source: dict[str, dict[str, int]] = {}
         for doc in docs:
             try:
-                if doc.source_type == "policy":
-                    report["documents_skipped"] += 1
-                    report["warnings"].append(f"Skipped policy document {doc.doc_id}; policy retrieval is handled by later semantic retrieval stages.")
-                    continue
                 before = dict(report["rows_inserted"])
                 if doc.source_type == "trademark":
                     self._load_trademark(doc, report)

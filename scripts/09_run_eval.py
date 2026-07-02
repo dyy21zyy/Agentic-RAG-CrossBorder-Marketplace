@@ -21,21 +21,21 @@ def _load_env():
 def _chunk(cid, doc, st, text): return EvidenceChunk(cid,doc,st,"fixture",st.title(),text,{})
 CHUNKS={
 "trademark":_chunk("trademark:sn:90000001:trademark_class:12","trademark:sn:90000001","trademark","MERCEDES trademark belongs to Nice Class 12."),
-"policy_tm":_chunk("policy:temu:ip:trademark","policy:temu:ip","policy","Temu policy prohibits trademark infringement and unauthorized brand logos."),
+"trademark_tm":_chunk("trademark:brand:ip:trademark","trademark:brand:ip","trademark","Trademark evidence prohibits trademark infringement and unauthorized brand logos."),
 "patent":_chunk("patent:US1234567:claims","patent:US1234567","patent","Patent US1234567 claims a protective phone case structure."),
 "litigation":_chunk("litigation:US1234567:case1:summary","litigation:US1234567:case1","litigation","Litigation history cites patent US1234567 in a marketplace dispute."),
-"policy_counterfeit":_chunk("policy:temu:enforcement:counterfeit","policy:temu:enforcement","policy","Policy evidence mentions counterfeit listing removal."),
+"trademark_counterfeit":_chunk("trademark:brand:enforcement:counterfeit","trademark:brand:enforcement","trademark","Trademark evidence mentions counterfeit listing removal."),
 }
 class DemoAgent:
     def __init__(self, source_types=None): self.source_types=set(source_types) if source_types else None
     def run(self, query):
         q=query.lower(); st=AgentState(query=query); ev=[]
         if "nice" in q or "mercedes belong" in q: st.retrieval_route="sql"; st.expected_answer_type="direct_field_answer"; ev=[CHUNKS["trademark"]]; st.answer="Class 12"
-        elif "phone case" in q: st.retrieval_route="multi_source_risk"; st.expected_answer_type="risk_assessment"; ev=[CHUNKS["policy_tm"],CHUNKS["trademark"]]; st.answer="Selling a phone case using the MERCEDES logo is high risk without authorization."
+        elif "phone case" in q: st.retrieval_route="multi_source_risk"; st.expected_answer_type="risk_assessment"; ev=[CHUNKS["trademark_tm"],CHUNKS["trademark"]]; st.answer="Selling a phone case using the MERCEDES logo is high risk without authorization."
         elif "litigation" in q: st.retrieval_route="mixed"; st.expected_answer_type="summary"; ev=[CHUNKS["litigation"],CHUNKS["patent"]]; st.answer="Litigation history cites patent US1234567 in a marketplace dispute."
         elif "patent" in q: st.retrieval_route="mixed"; st.expected_answer_type="explanation"; ev=[CHUNKS["patent"]]; st.answer="Patent US1234567 claims a protective phone case structure."
-        elif "counterfeit" in q: st.retrieval_route="hybrid"; st.expected_answer_type="evidence_summary"; ev=[CHUNKS["policy_counterfeit"]]; st.answer="Policy evidence mentions counterfeit listing removal."
-        else: st.retrieval_route="hybrid"; st.expected_answer_type="policy_summary"; ev=[CHUNKS["policy_tm"]]; st.answer="Temu policy prohibits trademark infringement."
+        elif "counterfeit" in q: st.retrieval_route="hybrid"; st.expected_answer_type="evidence_summary"; ev=[CHUNKS["trademark_counterfeit"]]; st.answer="Trademark evidence mentions counterfeit listing removal."
+        else: st.retrieval_route="hybrid"; st.expected_answer_type="trademark_explanation"; ev=[CHUNKS["trademark_tm"]]; st.answer="Trademark evidence prohibits trademark infringement."
         if self.source_types is not None: ev=[c for c in ev if c.source_type in self.source_types]
         st.retrieved_evidence=ev; st.reranked_evidence=ev; st.citations=[c.chunk_id for c in ev]; st.trace=["demo_mode"]
         return st
