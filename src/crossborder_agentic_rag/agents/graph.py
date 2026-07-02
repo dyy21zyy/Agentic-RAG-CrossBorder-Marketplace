@@ -6,6 +6,7 @@ from crossborder_agentic_rag.agents.classify import classify_query
 from crossborder_agentic_rag.agents.evaluator import evaluate_evidence
 from crossborder_agentic_rag.agents.planner import build_query_plan
 from crossborder_agentic_rag.agents.sql_router import SQLRouter
+from crossborder_agentic_rag.retrieval.source_balanced import SourceBalancedRetriever
 from crossborder_agentic_rag.retrieval.utils import dedupe_chunks
 from crossborder_agentic_rag.schemas.results import AgentState
 
@@ -33,6 +34,19 @@ class AgenticRAG:
             if "candidate_k" not in str(exc): raise
             return self.retriever.retrieve(query, dense_vector=vec, filters=plan.filters, top_k=plan.top_k, source_types=st, mode=selected_mode)
 
+    def _source_balanced_retrieve(self, query, plan, source_types):
+        balanced = SourceBalancedRetriever(
+            self.retriever,
+            mode=self.retrieval_mode,
+            per_source_k=min(plan.top_k, max(1, self.candidate_k)),
+            final_k=plan.top_k,
+            candidate_k=self.candidate_k,
+        )
+        return balanced.retrieve(query, dense_vector=self._embed(query), filters=plan.filters, source_types=source_types)
+
+    def _should_use_source_balanced(self, plan, source_types) -> bool:
+        return plan.retrieval_route in {"mixed", "multi_source_risk"} and len(source_types or []) > 1
+
     def _finalize_evidence(self, query, evidence, top_k):
         deduped = dedupe_chunks(evidence)
         reranker = getattr(self.retriever, "reranker", None) if self.retriever is not None else None
@@ -51,10 +65,17 @@ class AgenticRAG:
         elif plan.retrieval_route=="mixed":
             if self.duckdb_store is not None:
                 state.sql_results=SQLRouter(self.duckdb_store).run(plan); state.add_tool_call("sql_router", plan.filters); state.add_trace("sql_lookup")
-            state.retrieved_evidence=dedupe_chunks(self._retrieve(plan.query, plan)); state.add_tool_call("hybrid_retriever", self._payload(plan.top_k, plan.source_types)); state.add_trace("mixed_hybrid_retrieval")
+            sources=plan.source_types or []
+            if self._should_use_source_balanced(plan, sources):
+                state.retrieved_evidence=dedupe_chunks(self._source_balanced_retrieve(plan.query, plan, sources)); state.add_tool_call("source_balanced_retriever", self._payload(plan.top_k, sources)); state.add_trace("mixed_source_balanced_retrieval"); state.add_trace("mixed_hybrid_retrieval")
+            else:
+                state.retrieved_evidence=dedupe_chunks(self._retrieve(plan.query, plan)); state.add_tool_call("hybrid_retriever", self._payload(plan.top_k, plan.source_types)); state.add_trace("mixed_hybrid_retrieval")
         elif plan.retrieval_route=="multi_source_risk":
             sources=plan.source_types or ["trademark","patent","litigation"]
-            state.retrieved_evidence=dedupe_chunks(self._retrieve(plan.query, plan, source_types=sources)); state.add_tool_call("hybrid_retriever", self._payload(plan.top_k, sources)); state.add_trace("multi_source_risk_retrieval")
+            if self._should_use_source_balanced(plan, sources):
+                state.retrieved_evidence=dedupe_chunks(self._source_balanced_retrieve(plan.query, plan, sources)); state.add_tool_call("source_balanced_retriever", self._payload(plan.top_k, sources)); state.add_trace("multi_source_risk_source_balanced_retrieval"); state.add_trace("multi_source_risk_retrieval")
+            else:
+                state.retrieved_evidence=dedupe_chunks(self._retrieve(plan.query, plan, source_types=sources)); state.add_tool_call("hybrid_retriever", self._payload(plan.top_k, sources)); state.add_trace("multi_source_risk_retrieval")
         ev=evaluate_evidence(plan, state.retrieved_evidence, state.sql_results); state.evidence_gaps=ev.evidence_gaps; state.add_trace("evaluate_evidence")
         while not ev.is_sufficient and state.iterations < self.max_iterations and self.retriever is not None:
             state.iterations += 1
