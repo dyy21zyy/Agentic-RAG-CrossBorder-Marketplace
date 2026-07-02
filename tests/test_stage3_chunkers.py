@@ -69,6 +69,14 @@ def test_trademark_chunk_metadata_preserves_key_fields():
         assert key in identity.metadata
 
 
+def test_trademark_chunks_include_phase2_metadata():
+    chunks = chunk_document(by_type("trademark"))
+    assert all(c.metadata["parent_id"].startswith("trademark:") for c in chunks)
+    assert all(c.metadata["partition"] == "trademark_db" for c in chunks)
+    assert any(c.metadata["context_path"].endswith(" > Identity") for c in chunks)
+    assert any("MERCEDES" in c.metadata["entity_mentions"] for c in chunks)
+
+
 def test_patent_claims_are_split_into_individual_chunks():
     claims = [c for c in chunk_document(by_type("patent")) if c.source_subtype == "patent_claim"]
     assert len(claims) == 2
@@ -85,6 +93,17 @@ def test_patent_claim_chunks_preserve_claim_number():
     claims = [c for c in chunk_document(by_type("patent")) if c.source_subtype == "patent_claim"]
     assert [c.metadata["claim_number"] for c in claims] == ["1", "2"]
     assert all(c.metadata["patent_id"] == "US1234567" for c in claims)
+
+
+def test_patent_claim_chunks_include_phase2_metadata_and_subtype_unchanged():
+    claims = [c for c in chunk_document(by_type("patent")) if c.source_subtype == "patent_claim"]
+    assert claims
+    for claim in claims:
+        assert claim.source_subtype == "patent_claim"
+        assert claim.metadata["parent_id"] == "patent:US1234567"
+        assert claim.metadata["partition"] == "patent_db"
+        assert claim.metadata["context_path"] == f"Patent > US1234567 > Claim {claim.metadata['claim_number']}"
+        assert claim.metadata["claim_number"] in claim.metadata["entity_mentions"]
 
 
 def test_chunk_document_rejects_policy_source_type():
@@ -114,6 +133,14 @@ def test_litigation_chunks_do_not_duplicate_full_case_content_for_every_chunk():
 def test_litigation_patent_chunk_preserves_patent_number():
     pat = next(c for c in chunk_document(by_type("litigation")) if c.source_subtype == "litigation_patent")
     assert pat.metadata["patent_number"] == "US1234567" and "US1234567" in pat.content
+
+
+def test_litigation_chunks_include_phase2_metadata():
+    chunks = chunk_document(by_type("litigation"))
+    assert all(c.metadata["parent_id"].startswith("litigation:") for c in chunks)
+    assert all(c.metadata["partition"] == "litigation_db" for c in chunks)
+    assert any(c.metadata["context_path"].endswith(" > Case Summary") for c in chunks)
+    assert any("US1234567" in c.metadata["entity_mentions"] for c in chunks if c.source_subtype == "litigation_patent")
 
 
 def test_write_and_read_chunks_jsonl_roundtrip(tmp_path):
