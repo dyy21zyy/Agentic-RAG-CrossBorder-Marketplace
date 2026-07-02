@@ -8,9 +8,14 @@ dependencies = [
     "python-dotenv>=1.0",
     "duckdb>=0.10",
     "requests>=2.31",
+    "langchain>=0.2",
+    "langchain-core>=0.2",
 ]
 
 [project.optional-dependencies]
+llm = [
+    "langchain-openai>=0.1",
+]
 dev = [
     "pytest>=8.0",
 ]
