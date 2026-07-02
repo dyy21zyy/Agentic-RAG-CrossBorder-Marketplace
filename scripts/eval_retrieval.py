@@ -13,7 +13,7 @@ from crossborder_agentic_rag.retrieval import HybridRetriever, LocalBM25Retrieve
 
 class DemoVectorStore:
     def __init__(self,chunks): self.chunks=chunks
-    def dense_search(self,dense_vector,filters=None,top_k=20): return self.chunks[:top_k]
+    def dense_search(self,dense_vector,filters=None,source_types=None,top_k=20): return self.chunks[:top_k]
 
 def hitdict(c):
     d=c.to_dict(); d["content_preview"]=d.pop("content")[:240]; return d
