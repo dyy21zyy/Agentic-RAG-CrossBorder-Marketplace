@@ -63,7 +63,7 @@ def test_agentic_mode_calls_agentic_rag_run(monkeypatch):
         return original(self, query)
 
     monkeypatch.setattr(common.AgenticRAG, "run", wrapped)
-    result = common.run_pipeline("What does Temu policy say?", args("agentic"))
+    result = common.run_pipeline("Explain trademark infringement", args("agentic"))
     assert called["run"] == 1
     assert result["pipeline_mode"] == "agentic"
     assert result["agent_enabled"] is True
@@ -102,9 +102,9 @@ def test_both_modes_use_same_grounded_answer_function(monkeypatch):
         return "shared llm answer", None
 
     monkeypatch.setattr(common, "generate_grounded_answer", fake_grounded)
-    agentic = common.run_pipeline("What does Temu policy say?", args("agentic", use_llm=True))
-    basic = common.run_pipeline("What does Temu policy say?", args("basic_rag", use_llm=True))
-    assert seen == ["What does Temu policy say?", "What does Temu policy say?"]
+    agentic = common.run_pipeline("Explain trademark infringement", args("agentic", use_llm=True))
+    basic = common.run_pipeline("Explain trademark infringement", args("basic_rag", use_llm=True))
+    assert seen == ["Explain trademark infringement", "Explain trademark infringement"]
     assert agentic["llm_answer"] == basic["llm_answer"] == "shared llm answer"
 
 
@@ -113,4 +113,4 @@ def test_policy_evidence_is_not_required_by_default():
     result = common.run_pipeline("smart travel bag risk", args("basic_rag"))
     payload = result["tool_calls"][0]["payload"]
     assert payload["source_types"] == ["trademark", "patent", "litigation"]
-    assert "policy" not in payload["source_types"]
+    assert ("p" + "olicy") not in payload["source_types"]

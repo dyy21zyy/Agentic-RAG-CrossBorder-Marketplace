@@ -21,16 +21,14 @@ def evaluate_evidence(plan: QueryPlan, evidence: list[EvidenceChunk], sql_result
     sql_results = sql_results or []
     missing=[]
     t=plan.expected_answer_type
-    if t=="policy_answer" and not _has(evidence,"policy"): missing.append("policy")
-    elif t=="patent_explanation" and not (_has(evidence,"patent") or _sql_has(sql_results,"patent")): missing.append("patent")
+    if t=="patent_explanation" and not (_has(evidence,"patent") or _sql_has(sql_results,"patent")): missing.append("patent")
     elif t=="trademark_explanation" and not (_has(evidence,"trademark") or _sql_has(sql_results,"trademark")): missing.append("trademark")
     elif t=="litigation_summary" and not (_has(evidence,"litigation") or _sql_has(sql_results,"litigation")): missing.append("litigation")
     elif t=="risk_analysis":
-        if "policy" in plan.source_types and "policy" in plan.query.lower() and not _has(evidence,"policy"):
-            missing.append("policy")
-        if not (_has(evidence,"trademark") or _has(evidence,"patent") or _has(evidence,"litigation") or sql_results):
-            for st in ["trademark","patent","litigation"]:
-                if st in plan.source_types or not plan.source_types: missing.append(st); break
+        required = plan.source_types or ["trademark", "patent", "litigation"]
+        for st in required:
+            if not (_has(evidence, st) or _sql_has(sql_results, st)):
+                missing.append(st)
     elif t=="direct_field_answer":
         if not sql_results and not evidence: missing.append(plan.source_types[0] if plan.source_types else "structured")
     sufficient = not missing

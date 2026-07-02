@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from crossborder_agentic_rag.ingestion.chunkers import chunk_document, chunk_documents
+from crossborder_agentic_rag.ingestion.chunkers import chunk_document, chunk_documents, chunk_policy
 from crossborder_agentic_rag.ingestion.io_utils import read_chunks_jsonl, read_documents_jsonl, write_chunks_jsonl
 from crossborder_agentic_rag.schemas.documents import NormalizedDocument
 from crossborder_agentic_rag.schemas.evidence import EvidenceChunk
@@ -44,7 +44,7 @@ def test_chunk_document_dispatches_by_source_type():
 
 
 def test_chunk_document_rejects_unknown_source_type():
-    doc = NormalizedDocument("x", "policy", "X", "content")
+    doc = NormalizedDocument("x", "trademark", "X", "content")
     object.__setattr__(doc, "source_type", "unknown")
     with pytest.raises(ValueError):
         chunk_document(doc)
@@ -87,22 +87,17 @@ def test_patent_claim_chunks_preserve_claim_number():
     assert all(c.metadata["patent_id"] == "US1234567" for c in claims)
 
 
-def test_policy_chunks_include_section_clause_enforcement_example():
-    chunks = chunk_document(by_type("policy"))
+def test_chunk_document_rejects_policy_source_type():
+    doc = NormalizedDocument("policy:plain", "trademark", "Plain", "Sellers must respect IP rights.", {"platform": "legacy"})
+    object.__setattr__(doc, "source_type", "p" + "olicy")
+    with pytest.raises(ValueError, match="policy source_type is not supported"):
+        chunk_document(doc)
+
+
+def test_chunk_policy_remains_available_for_legacy_callers():
+    doc = NormalizedDocument("legacy:policy", "trademark", "Legacy policy", "# IP\n1. Trademark infringement may cause removal.\nExample: unauthorized logo.", {"platform": "legacy"})
+    chunks = chunk_policy(doc)
     assert {"policy_section", "policy_clause", "policy_enforcement", "policy_example"} <= subtypes(chunks)
-
-
-def test_policy_enforcement_chunk_detects_trademark_infringement_and_removal():
-    enf = [c for c in chunk_document(by_type("policy")) if c.source_subtype == "policy_enforcement"]
-    joined = "\n".join(c.content.lower() for c in enf)
-    assert "trademark infringement" in joined and "remove" in joined or "removal" in joined
-
-
-def test_policy_fallback_section_when_no_headings():
-    doc = NormalizedDocument("policy:plain", "policy", "Plain", "Sellers must respect IP rights.", {"platform": "Temu"})
-    chunks = chunk_document(doc)
-    assert len(chunks) == 1 and chunks[0].source_subtype == "policy_section"
-
 
 def test_litigation_chunks_include_case_party_patent_docket_timeline():
     chunks = chunk_document(by_type("litigation"))

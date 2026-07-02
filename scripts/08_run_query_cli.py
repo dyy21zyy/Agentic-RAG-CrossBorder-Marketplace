@@ -26,7 +26,7 @@ def _load_env():
 
 def _demo_chunks():
     return [
-        EvidenceChunk("policy:temu-ip:0","temu-ip","policy","policy_enforcement","Temu IP Policy","Temu policy prohibits trademark infringement and counterfeit goods; listings may be removed and sellers may appeal.",{"chunk_index":0}),
+        EvidenceChunk("trademark:brand-logo:0","brand-logo","trademark","trademark_record","Brand logo trademark","Trademark evidence describes infringement risk from unauthorized brand logos.",{"chunk_index":0}),
         EvidenceChunk("tm:mercedes:0","tm-mercedes","trademark","classes","MERCEDES trademark","MERCEDES registration number 1234567 covers Nice class 12 vehicles and related goods/services.",{"word_mark":"MERCEDES","registration_number":"1234567","chunk_index":0}),
         EvidenceChunk("pat:us1234567:0","pat-us1234567","patent","claims","US1234567 Patent","US1234567 includes a claim for drone delivery control and related drawing description.",{"patent_number":"US1234567","chunk_index":0}),
         EvidenceChunk("lit:case:0","lit-case","litigation","docket","Patent litigation case","Case 1:23-cv-00001 lists parties Example Corp v Seller and docket summary for patent US1234567.",{"case_number":"1:23-cv-00001","patent_number":"US1234567","chunk_index":0}),

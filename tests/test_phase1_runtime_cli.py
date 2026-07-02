@@ -56,7 +56,7 @@ def test_dense_missing_uri_and_empty_query_fail_clearly():
     assert cp.returncode!=0 and '--query must be non-empty' in cp.stderr
 
 def test_hybrid_bm25_only_json_without_milvus():
-    cp=run([sys.executable,'scripts/run_hybrid_query.py','--chunks-path',str(FIX),'--query','Temu trademark removal','--mode','bm25_only','--top-k','2','--output-json'])
+    cp=run([sys.executable,'scripts/run_hybrid_query.py','--chunks-path',str(FIX),'--query','trademark removal','--mode','bm25_only','--top-k','2','--output-json'])
     assert cp.returncode==0, cp.stderr
     data=json.loads(cp.stdout)
     assert data['mode']=='bm25_only' and isinstance(data['hits'], list) and 'source_type_counts' in data

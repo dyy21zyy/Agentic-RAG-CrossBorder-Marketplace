@@ -34,7 +34,7 @@ def test_normalized_document_rejects_empty_doc_id() -> None:
 
 
 def test_normalized_document_to_dict_from_dict_roundtrip() -> None:
-    doc = NormalizedDocument("doc-1", "policy", "Title", "Content", {"jurisdiction": "US"})
+    doc = NormalizedDocument("doc-1", "trademark", "Title", "Content", {"jurisdiction": "US"})
     assert NormalizedDocument.from_dict(doc.to_dict()) == doc
 
 
@@ -87,7 +87,7 @@ def test_query_plan_rejects_non_positive_top_k() -> None:
 
 
 def test_query_plan_to_dict_from_dict_roundtrip() -> None:
-    plan = QueryPlan("query", "lookup", "fact", "mixed", {"year": 2024}, ["policy"], 5)
+    plan = QueryPlan("query", "lookup", "fact", "mixed", {"year": 2024}, ["trademark"], 5)
     assert QueryPlan.from_dict(plan.to_dict()) == plan
 
 
@@ -162,7 +162,7 @@ def test_embedding_factory_rejects_unknown_provider() -> None:
 
 
 def _chunk(identifier: int, score: float = 1.0) -> EvidenceChunk:
-    return EvidenceChunk(f"chunk-{identifier}", f"doc-{identifier}", "policy", "policy", f"Title {identifier}", "Content", score=score)
+    return EvidenceChunk(f"chunk-{identifier}", f"doc-{identifier}", "trademark", "trademark", f"Title {identifier}", "Content", score=score)
 
 
 def test_noop_reranker_returns_top_k() -> None:

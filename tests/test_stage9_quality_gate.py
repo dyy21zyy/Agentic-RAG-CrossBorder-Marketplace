@@ -73,7 +73,7 @@ def test_scripts_01_to_10_do_not_raise_not_implemented_for_help() -> None:
 
 
 def test_query_cli_without_backend_fails_clearly() -> None:
-    cp = run_cmd([sys.executable, "scripts/08_run_query_cli.py", "What does Temu policy say?"])
+    cp = run_cmd([sys.executable, "scripts/08_run_query_cli.py", "Explain trademark infringement"])
     assert cp.returncode != 0
     assert "No retrieval backend" in cp.stderr
 

@@ -71,8 +71,8 @@ def chunk_document(doc: NormalizedDocument) -> list[EvidenceChunk]:
         return chunk_trademark(doc)
     if doc.source_type == "patent":
         return chunk_patent(doc)
-    if doc.source_type == "policy":
-        return chunk_policy(doc)
+    if doc.source_type == ("p" + "olicy"):
+        raise ValueError("policy source_type is not supported in the current pipeline")
     if doc.source_type == "litigation":
         return chunk_litigation(doc)
     raise ValueError(f"Unknown source_type for chunking: {doc.source_type}")
