@@ -17,7 +17,7 @@ class BM25:
     def search(self,q,filters=None,source_types=None,top_k=20): self.calls.append(top_k); return self.hits[:top_k]
 class Dense:
     def __init__(self, hits): self.hits=hits; self.calls=[]
-    def dense_search(self,vec,filters=None,top_k=20): self.calls.append(top_k); return self.hits[:top_k]
+    def dense_search(self,vec,filters=None,source_types=None,top_k=20): self.calls.append(top_k); return self.hits[:top_k]
 
 def test_lexical_reranker_returns_top_k_and_improves_term_match():
     cands=[chunk(1,"Marketplace server","unrelated systems"),chunk(2,"Design patent bag","luggage ornamental design"),chunk(3,"Utility patent travel bag claim","smart travel bag luggage patent claim")]
