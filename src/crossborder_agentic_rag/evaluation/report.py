@@ -12,7 +12,7 @@ def write_eval_results_json(results:list[EvalResult], path:str|Path)->None: _wri
 def write_eval_summary_json(summary:EvalSummary, path:str|Path)->None: _write_json(asdict(summary), path)
 def write_eval_results_csv(results:list[EvalResult], path:str|Path)->None:
     p=Path(path); p.parent.mkdir(parents=True, exist_ok=True)
-    fields=["query_id","query","predicted_route","expected_route","predicted_answer_type","expected_answer_type","answer","gold_answer","citations","retrieved_chunk_ids","retrieved_doc_ids","predicted_source_types"]
+    fields=["query_id","query","predicted_route","expected_route","predicted_answer_type","expected_answer_type","answer","gold_answer","citations","retrieved_chunk_ids","retrieved_doc_ids","predicted_source_types","expected_source_types","predicted_tools","expected_tools","predicted_partitions","expected_partitions"]
     metric_keys=sorted({k for r in results for k in r.metrics})
     with p.open("w",encoding="utf-8",newline="") as f:
         w=csv.DictWriter(f, fieldnames=fields+metric_keys); w.writeheader()

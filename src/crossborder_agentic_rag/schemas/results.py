@@ -31,6 +31,8 @@ class AgentState:
     iterations: int = 0
     answer: str = ""
     citations: list[str] = field(default_factory=list)
+    latency_breakdown: dict[str, float] = field(default_factory=dict)
+    partitions_used: list[str] = field(default_factory=list)
     trace: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:

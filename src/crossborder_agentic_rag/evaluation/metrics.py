@@ -118,3 +118,42 @@ def mean(values:list[float])->float:
 def safe_round(value:float, digits:int=4)->float:
     try: return round(float(value), digits)
     except (TypeError, ValueError): return 0.0
+
+def ndcg_at_k_graded(retrieved_ids:list[str], relevance_grades:dict[str,int], k:int)->float:
+    _check_k(k)
+    if not relevance_grades or not retrieved_ids: return 0.0
+    dcg=0.0
+    for idx, rid in enumerate(_dedup(retrieved_ids)[:k], start=1):
+        rel=max(0, int(relevance_grades.get(rid, 0) or 0))
+        if rel: dcg += ((2 ** rel) - 1) / math.log2(idx + 1)
+    ideal_grades=sorted((max(0, int(v or 0)) for v in relevance_grades.values()), reverse=True)[:k]
+    idcg=sum(((2 ** rel) - 1) / math.log2(idx + 1) for idx, rel in enumerate(ideal_grades, start=1) if rel)
+    return 0.0 if idcg==0 else dcg/idcg
+
+def tool_call_accuracy(predicted_tools:list[str], expected_tools:list[str])->float:
+    exp=set(expected_tools or [])
+    if not exp: return 1.0
+    return 1.0 if exp <= set(predicted_tools or []) else 0.0
+
+def tool_call_f1(predicted_tools:list[str], expected_tools:list[str])->float:
+    pred=set(predicted_tools or []); exp=set(expected_tools or [])
+    if not exp: return 1.0
+    if not pred: return 0.0
+    overlap=len(pred & exp)
+    if overlap==0: return 0.0
+    prec=overlap/len(pred); rec=overlap/len(exp)
+    return 2*prec*rec/(prec+rec)
+
+def partition_accuracy(predicted_partitions:list[str], expected_partitions:list[str])->float:
+    exp=set(expected_partitions or [])
+    if not exp: return 1.0
+    return 1.0 if exp <= set(predicted_partitions or []) else 0.0
+
+def percentile(values:list[float], q:float)->float:
+    vals=sorted(float(v) for v in values if v is not None)
+    if not vals: return 0.0
+    if q <= 0: return vals[0]
+    if q >= 100: return vals[-1]
+    pos=(len(vals)-1)*(q/100.0); lo=math.floor(pos); hi=math.ceil(pos)
+    if lo==hi: return vals[int(pos)]
+    return vals[lo]*(hi-pos)+vals[hi]*(pos-lo)
