@@ -1,50 +1,124 @@
-# Agentic RAG for Cross-Border Marketplace Intellectual Property QA
+# Agentic RAG for Cross-Border E-Commerce IP QA
 
-跨境电商知识产权 Agentic RAG 问答系统
+This project builds a single-agent LangChain RAG + GraphRAG system for cross-border e-commerce intellectual property question answering. It focuses on trademark records, patent claims, and patent litigation evidence. The system combines Milvus dense retrieval, BM25 sparse retrieval, DuckDB exact lookup, lightweight NetworkX-based GraphRAG, RRF fusion, reranking, and grounded answer generation.
 
-## Project overview
+This system is not legal advice.
 
-This project is an Agentic RAG system for cross-border marketplace intellectual property QA over trademark, patent, patent litigation, and marketplace policy evidence. It is designed for source-aware answers to questions such as:
+---
 
-- trademark class / goods lookup
-- patent claim explanation
-- Temu policy question answering
-- patent litigation lookup
-- multi-source IP risk analysis
+## 1. What this project does
 
+The project is designed as a tutorial-friendly reference implementation for IP evidence retrieval and grounded QA. It helps answer questions such as:
 
+- Trademark similarity and goods/services evidence retrieval
+- Patent claim evidence retrieval
+- Litigation case evidence retrieval
+- Mixed IP risk assessment for cross-border e-commerce products
+- Entity-relation expansion through GraphRAG
+- Grounded answer generation with citations
 
-## Data sources
+The current scope is a **single-agent** workflow: one LangChain agent selects retrieval and lookup tools, gathers evidence, fuses/reranks results, and produces a cited answer.
 
-The intended evidence sources are:
+---
 
-- USPTO Trademark Full Text XML Data
-- PatentsView Granted Patent Long Text Data
-- Patent Litigation Docket Reports Data
-- Temu policy documents
+## 2. Why Agentic RAG for IP QA?
 
-Example local source paths, for documentation only; these are not hard-coded in Python:
+A simple RAG pipeline is often enough for small document collections:
 
 ```text
-C:\Users\dyy21\OneDrive\TJ\工作\Code\Rag\Rag_document\Trademark Full Text XML Data
-C:\Users\dyy21\OneDrive\TJ\工作\Code\Rag\Rag_document\PatentsView Granted Patent Long Text Data
-C:\Users\dyy21\OneDrive\TJ\工作\Code\Rag\Rag_document\Patent Litigation Docket Reports Data
-C:\Users\dyy21\OneDrive\TJ\工作\Code\Rag\Rag_document\Temu
+query -> retrieve -> answer
 ```
 
-Raw data, generated DuckDB files, vector indexes, and large processed artifacts must not be committed.
+Cross-border e-commerce IP QA is more demanding. A seller, analyst, or compliance reviewer may need exact identifiers, semantic matching, and entity relationships in the same question. This project therefore uses an agentic retrieval pattern:
 
-## System architecture
+```text
+query
+  -> single LangChain Agent
+  -> tool selection
+  -> trademark / patent / litigation / DuckDB / GraphRAG retrieval
+  -> fusion
+  -> rerank
+  -> grounded answer
+```
 
-1. **Ingestion** parses trademark XML, patent TSV, litigation CSV, and policy documents.
-2. **Normalization** writes source-typed JSONL documents.
-3. **Chunking** converts normalized documents into logical evidence chunks.
-4. **Structured storage** loads fields into DuckDB for exact lookup.
-5. **Retrieval** combines local BM25, optional Milvus dense retrieval, RRF fusion, and reranking.
-6. **Agent workflow** classifies the query, plans retrieval, routes SQL-style lookups, evaluates evidence, and synthesizes adaptive answers.
-7. **Evaluation** computes deterministic retrieval, routing, answer proxy, and ablation metrics.
+Why this helps:
 
-## Repository structure
+| Need in IP QA | Example | Component used |
+|---|---|---|
+| Structured field lookup | registration number, serial number, Nice class, patent number, case number | DuckDB exact lookup |
+| Semantic evidence search | product feature, patent claim language, litigation summary | Milvus dense retrieval + BM25 |
+| Hybrid ranking | combine lexical matches and semantic matches | RRF fusion + reranking |
+| Entity-relation expansion | company -> trademark -> patent -> case | NetworkX GraphRAG |
+| Source-grounded response | answer with evidence references, not unsupported claims | grounded answer generation |
+
+The goal is not to replace professional legal review. The goal is to make evidence discovery more reproducible, inspectable, and easier to evaluate.
+
+---
+
+## 3. Evidence sources
+
+Current core evidence sources:
+
+| Source | Used for |
+|---|---|
+| USPTO Trademark | word marks, serial / registration numbers, Nice classes, goods and services |
+| PatentsView Patent Claims / Metadata | claim-level patent evidence |
+| Patent Litigation Docket Reports | cases, parties, asserted patents, docket events |
+
+Raw data, generated DuckDB files, vector indexes, Milvus databases, model weights, and large processed artifacts should stay local and should not be committed.
+
+### Current out of scope
+
+- Marketplace policy QA
+- Temu policy QA
+- Patent expiration or legal deadline calculation
+- Long-term chat memory
+- Multi-agent orchestration
+
+---
+
+## 4. System architecture
+
+```mermaid
+flowchart TD
+    A[User Query] --> B[Stateless Query Normalization]
+    B --> C[Single LangChain Agent]
+    C --> D1[Trademark Search Tool]
+    C --> D2[Patent Search Tool]
+    C --> D3[Litigation Search Tool]
+    C --> D4[DuckDB Lookup Tool]
+    C --> D5[GraphRAG Tool]
+
+    D1 --> E[Milvus + BM25]
+    D2 --> E
+    D3 --> E
+    D4 --> F[DuckDB Exact Lookup]
+    D5 --> G[NetworkX GraphRAG]
+
+    E --> H[RRF Fusion]
+    F --> H
+    G --> H
+
+    H --> I[BGE Reranker]
+    I --> J[Grounded Answer Generation]
+    J --> K[Evaluation Log]
+```
+
+### Retrieval layers
+
+| Layer | Purpose | Typical command or module |
+|---|---|---|
+| Normalized JSONL | common document format across evidence sources | parser scripts `01`-`03` |
+| Chunks JSONL | retrievable evidence units | `scripts/05_build_chunks.py` |
+| DuckDB | exact structured lookup | `scripts/06_build_duckdb.py` |
+| BM25 | local lexical retrieval | query/eval CLIs |
+| Milvus | dense vector retrieval | `scripts/07_build_milvus_index.py` |
+| GraphRAG | lightweight entity-neighborhood expansion | NetworkX graph utilities |
+| Reranker | second-stage ranking | lexical or local BGE reranker |
+
+---
+
+## 5. Repository map
 
 ```text
 Agentic-RAG-CrossBorder-Marketplace/
@@ -52,15 +126,35 @@ Agentic-RAG-CrossBorder-Marketplace/
 ├── pyproject.toml
 ├── .env.example
 ├── docker-compose.yml
-├── configs/
-├── scripts/                    # scripts 01-10 for pipeline, query, eval, ablation
-├── src/crossborder_agentic_rag/ # ingestion, storage, retrieval, agents, evaluation
-└── tests/                      # unit tests and fixture E2E tests
+├── configs/                    # paths, retrieval, Milvus, DuckDB, evaluation settings
+├── eval/                       # small tracked evaluation query sets
+├── scripts/                    # ingestion, indexing, query, GraphRAG, evaluation CLIs
+├── src/crossborder_agentic_rag/ # package source code
+└── tests/                      # unit, fixture, and pipeline tests
 ```
 
-## Installation
+The staged core pipeline is organized around scripts `01` through `10`:
 
-Linux/macOS:
+| Step | Script | Output |
+|---|---|---|
+| 1 | `scripts/01_parse_trademark_xml.py` | normalized trademark JSONL |
+| 2 | `scripts/02_parse_patent_tsv.py` | normalized patent JSONL |
+| 3 | `scripts/03_parse_litigation_csv.py` | normalized litigation JSONL |
+| Compatibility | `scripts/04_parse_policy_docs.py` | optional legacy parser; not a current core evidence source |
+| 4 | `scripts/05_build_chunks.py` | evidence chunks JSONL |
+| 5 | `scripts/06_build_duckdb.py` | DuckDB lookup database |
+| 6 | `scripts/07_build_milvus_index.py` | Milvus collection or dry-run report |
+| 7 | `scripts/08_run_query_cli.py` | grounded query response |
+| 8 | `scripts/09_run_eval.py` | evaluation outputs |
+| 9 | `scripts/10_run_ablation.py` | ablation outputs |
+
+`FakeEmbeddingProvider is only for tests and smoke runs`. `Real semantic retrieval requires` OpenAI-compatible embeddings or local sentence-transformer embeddings.
+
+---
+
+## 6. Installation
+
+### Linux / macOS
 
 ```bash
 python -m venv .venv
@@ -69,7 +163,7 @@ python -m pip install -e '.[dev]'
 cp .env.example .env
 ```
 
-Windows PowerShell:
+### Windows PowerShell
 
 ```powershell
 python -m venv .venv
@@ -78,328 +172,188 @@ python -m pip install -e ".[dev]"
 copy .env.example .env
 ```
 
-Optional dependencies:
+### Optional extras
 
 ```bash
+# Milvus support
 python -m pip install -e '.[milvus]'
+
+# Local embedding support
 python -m pip install -e '.[local]'
+
+# Local reranker support
 python -m pip install -e '.[reranker]'
 ```
 
-## Environment variables
+Key environment variables:
 
-Key environment variables include:
+| Variable | Purpose |
+|---|---|
+| `EMBEDDING_PROVIDER` | selects fake, local, or OpenAI-compatible embeddings |
+| `EMBEDDING_MODEL` | embedding model name/path |
+| `EMBEDDING_DIM` | embedding dimensionality expected by the index |
+| `RERANKER_PROVIDER` | noop, lexical, or local reranker selection |
+| `MILVUS_URI` / `RAG_MILVUS_URI` | Milvus server or Milvus Lite database URI |
+| `MILVUS_COLLECTION_NAME` | target vector collection |
+| `DUCKDB_PATH` | structured lookup database path |
+| `TRADEMARK_RAW_DIR` | local USPTO trademark source folder |
+| `PATENT_RAW_DIR` | local PatentsView source folder |
+| `LITIGATION_RAW_DIR` | local litigation source folder |
+| `MAX_RETRIEVAL_ITERATIONS` | retrieval loop guardrail |
 
-- `EMBEDDING_PROVIDER`
-- `EMBEDDING_API_KEY`
-- `EMBEDDING_API_BASE`
-- `EMBEDDING_MODEL`
-- `EMBEDDING_DIM`
-- `RERANKER_PROVIDER`
-- `MILVUS_URI`
-- `MILVUS_COLLECTION_NAME`
-- `DUCKDB_PATH`
-- `TRADEMARK_RAW_DIR`
-- `PATENT_RAW_DIR`
-- `LITIGATION_RAW_DIR`
-- `POLICY_RAW_DIR`
-- `MAX_RETRIEVAL_ITERATIONS`
+---
 
-FakeEmbeddingProvider is only for tests and smoke runs. Real semantic retrieval requires OpenAI-compatible or local sentence-transformer embeddings.
+## 7. Quickstart with fixtures
 
-## Local fixture quickstart
-
-Run the complete Stage 8 fixture pipeline test:
+Use the fixture-based end-to-end test when you want to verify the pipeline without full datasets:
 
 ```bash
 pytest -q tests/test_stage8_end_to_end.py
 ```
 
-Manual fixture path examples use `tests/fixtures/e2e` and a temporary or ignored output directory such as `data/processed`.
-
-## Full-data local path examples
-
-Use the environment variables above or substitute quoted paths in commands. Example Windows source folders are documented under **Data sources**. Do not commit full raw datasets or generated artifacts.
-
-## Step-by-step pipeline commands
-
-### Parse trademark
-
-```bash
-python scripts/01_parse_trademark_xml.py --input "<TRADEMARK_RAW_DIR>" --output data/processed/trademarks.jsonl --report data/processed/trademark_report.json
-```
-
-### Parse patent
-
-```bash
-python scripts/02_parse_patent_tsv.py --input "<PATENT_RAW_DIR>" --output data/processed/patents.jsonl --report data/processed/patent_report.json
-```
-
-### Parse litigation
-
-```bash
-python scripts/03_parse_litigation_csv.py --input "<LITIGATION_RAW_DIR>" --output data/processed/litigation.jsonl --report data/processed/litigation_report.json
-```
-
-### Parse policy
-
-```bash
-python scripts/04_parse_policy_docs.py --input "<POLICY_RAW_DIR>" --output data/processed/policies.jsonl --report data/processed/policy_report.json
-```
-
-### Combine JSONL files
-
-Concatenate the four normalized document files into:
-
-```text
-data/processed/all_docs.jsonl
-```
-
-Example:
-
-```bash
-cat data/processed/trademarks.jsonl data/processed/patents.jsonl data/processed/litigation.jsonl data/processed/policies.jsonl > data/processed/all_docs.jsonl
-```
-
-### Build chunks
-
-```bash
-python scripts/05_build_chunks.py --input data/processed/all_docs.jsonl --output data/processed/chunks.jsonl --report data/processed/chunk_report.json
-```
-
-### Build DuckDB
-
-```bash
-python scripts/06_build_duckdb.py --input data/processed/all_docs.jsonl --duckdb-path data/processed/ip.duckdb --report data/processed/duckdb_report.json --overwrite
-```
-
-### Build Milvus dry-run
-
-```bash
-python scripts/07_build_milvus_index.py --input data/processed/chunks.jsonl --dry-run --report data/processed/milvus_report.json
-```
-
-### Build Milvus real mode
-
-```bash
-docker compose up -d
-python scripts/07_build_milvus_index.py --input data/processed/chunks.jsonl --collection-name ip_chunks --embedding-provider local --overwrite --report data/processed/milvus_report.json
-```
-
-### Run query CLI
-
-```bash
-python scripts/08_run_query_cli.py "What does Temu policy say about trademark infringement?" --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --output-json
-```
-
-### Run evaluation
-
-```bash
-python scripts/09_run_eval.py --eval-file tests/fixtures/e2e/eval/eval_queries.jsonl --output-dir data/eval --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl
-```
-
-### Run ablation
-
-```bash
-python scripts/10_run_ablation.py --eval-file tests/fixtures/e2e/eval/eval_queries.jsonl --output-dir data/eval/ablation --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --experiments bm25_only,hybrid_rrf,no_reranker
-```
-
-## Milvus local development
-
-Real Milvus mode requires a running Milvus instance, pymilvus installed, and real embeddings configured with `--embedding-provider openai-compatible` or `--embedding-provider local`. Mock Milvus is only used in unit tests. Dry-run mode does not insert into Milvus. Dry-run mode should not be interpreted as successful vector indexing.
-
-For local development:
-
-```bash
-docker compose up -d
-python scripts/07_build_milvus_index.py --input data/processed/chunks.jsonl --collection-name ip_chunks --embedding-provider local --overwrite --report data/processed/milvus_report.json
-```
-
-## Query CLI examples
-
-```bash
-python scripts/08_run_query_cli.py "Which Nice classes does MERCEDES belong to?" --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --output-json
-
-python scripts/08_run_query_cli.py "What does Temu policy say about trademark infringement?" --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --output-json
-
-python scripts/08_run_query_cli.py "Can I sell a phone case using the MERCEDES logo on Temu?" --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --output-json
-
-python scripts/08_run_query_cli.py "Summarize litigation history for patent US1234567." --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --output-json
-```
-
-Only risk_analysis answers include Risk Level. Plain policy questions about infringement are policy answers, not risk analysis.
-
-## Evaluation
-
-```bash
-python scripts/09_run_eval.py --eval-file tests/fixtures/e2e/eval/eval_queries.jsonl --output-dir data/eval --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl
-```
-
-Evaluation metrics are deterministic and do not call external LLM judges. FaithfulnessProxy is a heuristic, not a human-level factuality evaluator. Demo mode uses fixtures and fake embeddings. Full evaluation requires processed data and retrieval backends.
-
-## Ablation
-
-```bash
-python scripts/10_run_ablation.py --eval-file tests/fixtures/e2e/eval/eval_queries.jsonl --output-dir data/eval/ablation --duckdb-path data/processed/ip.duckdb --chunks-path data/processed/chunks.jsonl --experiments bm25_only,hybrid_rrf,no_reranker
-```
-
-Ablation experiments must actually change retrieval/reranking/source configuration.
-
-## Real-data readiness checklist
-
-Before running on full datasets:
-
-- Set `TRADEMARK_RAW_DIR`, `PATENT_RAW_DIR`, `LITIGATION_RAW_DIR`, and `POLICY_RAW_DIR` to local raw-data locations.
-- Run parser scripts 01-04 for trademark, patent, litigation, and policy inputs.
-- Combine normalized JSONL files into `data/processed/all_docs.jsonl`.
-- Run chunking script 05.
-- Run DuckDB build script 06.
-- Run Milvus dry-run script 07 first to validate chunk loading and embedding dimensions without insertion.
-- Start Milvus with docker compose for real vector indexing.
-- Use real embeddings for semantic retrieval; fake embeddings are for tests and smoke runs only.
-- Run the query CLI.
-- Run evaluation and ablation after processed data and retrieval backends are available.
-
-Full-data execution may take time and disk space. Do not commit raw or processed full-data artifacts.
-
-## Testing
+For a fast repository health check:
 
 ```bash
 python -m compileall -q src scripts
 pytest -q
-pytest -q tests/test_stage8_end_to_end.py
 rg -n "^(<<<<<<<|=======|>>>>>>>)" -S . || true
 ```
 
-## Known limitations
+---
 
-- Trademark XML field coverage may need expansion for all USPTO variants.
-- Patent TSV column variants are supported but may need adaptation for unseen releases.
-- Policy PDF parsing depends on optional pypdf.
-- HTML parsing is best effort.
-- Fake embeddings are not semantic.
-- Milvus real mode requires external service availability.
-- FaithfulnessProxy is not a substitute for expert review.
-- This project is not legal advice.
+## 8. Build the evidence pipeline
 
-## Stage completion status
+The examples below use local ignored paths under `data/processed`. Adjust paths for your environment.
 
-Stages 0-8 are implemented for the MVP staged workflow:
-
-- Stage 0: fixed scaffold
-- Stage 1: schemas and core interfaces
-- Stage 2: parsers and scripts 01-04
-- Stage 3: chunking and script 05
-- Stage 4: DuckDB and script 06
-- Stage 5: Milvus, BM25, RRF, rerankers, HybridRetriever, and script 07
-- Stage 6: Agentic RAG workflow and script 08
-- Stage 7: evaluation, ablation, and scripts 09-10
-- Stage 8: fixture-based end-to-end pipeline and final documentation
-
-## Phase 0: Data ingestion and parser quality
-
-Phase 0 hardens the ingestion/parsing layer before retrieval, reranking, LLM answering, or chat improvements. The current project version focuses on normalized evidence from:
-
-- Trademark records
-- Patent records and claim/long-text records
-- Patent litigation records
-
-Policy corpus ingestion may still exist for compatibility, but policy evidence is not required for default risk analysis in this version. Bad parsing creates incomplete documents, which then create bad chunks, weak retrieval, unreliable reranking, and poor LLM answers.
-
-Example parser and quality-check commands:
+### 8.1 Parse source datasets
 
 ```bash
-python scripts/01_parse_trademark_xml.py --input data/raw/trademarks --output data/processed/trademarks.jsonl --report data/processed/trademark_report.json
-python scripts/02_parse_patent_tsv.py --input data/raw/patents --output data/processed/patents.jsonl --report data/processed/patent_report.json
-python scripts/03_parse_litigation_csv.py --input data/raw/litigation --output data/processed/litigation.jsonl --report data/processed/litigation_report.json
-python scripts/check_ingestion_quality.py \
-  --input data/processed/normalized_docs.jsonl \
-  --require-source-types trademark,patent,litigation
+python scripts/01_parse_trademark_xml.py \
+  --input "<TRADEMARK_RAW_DIR>" \
+  --output data/processed/trademarks.jsonl \
+  --report data/processed/trademark_report.json
+
+python scripts/02_parse_patent_tsv.py \
+  --input "<PATENT_RAW_DIR>" \
+  --output data/processed/patents.jsonl \
+  --report data/processed/patent_report.json
+
+python scripts/03_parse_litigation_csv.py \
+  --input "<LITIGATION_RAW_DIR>" \
+  --output data/processed/litigation.jsonl \
+  --report data/processed/litigation_report.json
 ```
 
-This system supports compliance research and retrieval workflows, but it is not legal advice.
+### 8.2 Optional compatibility parser
 
-
-## Phase 1: Runtime CLI and Milvus Lite retrieval
-
-Phase 1 makes runtime retrieval easier to run without pasted Python heredocs. It adds stable CLI entry points for LLM API smoke tests, dense Milvus retrieval, and BM25/dense/hybrid retrieval. The retrieval scripts prefer `RAG_MILVUS_URI` for local Milvus Lite databases and only fall back to `MILVUS_URI` for backward compatibility.
-
-### Environment setup example
+The repository still contains a compatibility parser for legacy policy documents, but marketplace policy and Temu policy are not current core evidence sources for this README scope. Do not include this output in the default trademark/patent/litigation pipeline unless you are intentionally running a separate compatibility experiment.
 
 ```bash
-export RAG_MILVUS_URI=/root/autodl-tmp/Agentic_Rag/data/milvus_qa_300k.db
-export LOCAL_EMBEDDING_MODEL=/root/autodl-tmp/models/bge-small-en-v1.5
-export EMBEDDING_PROVIDER=local
-export OPENAI_BASE_URL=https://api-inference.modelscope.cn/v1
-export LLM_MODEL=deepseek-ai/DeepSeek-V4-Pro
+python scripts/04_parse_policy_docs.py \
+  --input "<OPTIONAL_POLICY_RAW_DIR>" \
+  --output data/processed/policies.jsonl \
+  --report data/processed/policy_report.json
 ```
 
-Set `OPENAI_API_KEY` in your shell or secret manager before running the LLM smoke test. Do not commit `.env`, model weights, local database files, or generated output artifacts.
-
-### Test LLM API
+### 8.3 Combine normalized records
 
 ```bash
-python scripts/test_llm_api.py
+cat \
+  data/processed/trademarks.jsonl \
+  data/processed/patents.jsonl \
+  data/processed/litigation.jsonl \
+  > data/processed/all_docs.jsonl
 ```
 
-The script prints whether `OPENAI_API_KEY` is set, but it never prints the key. It also prints `OPENAI_BASE_URL`, `LLM_MODEL`, and the final model response. Empty `choices` or empty message content fail clearly.
-
-### Dense query
+### 8.4 Build chunks and structured lookup
 
 ```bash
-python scripts/run_dense_query.py \
-  --query "Find patent claims related to drone delivery control." \
-  --top-k 10
+python scripts/05_build_chunks.py \
+  --input data/processed/all_docs.jsonl \
+  --output data/processed/chunks.jsonl \
+  --report data/processed/chunk_report.json
+
+python scripts/06_build_duckdb.py \
+  --input data/processed/all_docs.jsonl \
+  --duckdb-path data/processed/ip.duckdb \
+  --report data/processed/duckdb_report.json \
+  --overwrite
 ```
 
-Dense retrieval requires `RAG_MILVUS_URI` (or legacy `MILVUS_URI`), a collection such as `ip_chunks_qa_300k`, `pymilvus`, and a working embedding provider. Milvus Lite collections are loaded before search so a released collection does not fail with `call load() before search/get/query`.
+### 8.5 Validate Milvus input with dry-run mode
+
+```bash
+python scripts/07_build_milvus_index.py \
+  --input data/processed/chunks.jsonl \
+  --dry-run \
+  --report data/processed/milvus_report.json
+```
+
+Dry-run mode does not insert into Milvus and should not be interpreted as successful vector indexing.
+
+### 8.6 Build a real Milvus index
+
+```bash
+docker compose up -d
+
+python scripts/07_build_milvus_index.py \
+  --input data/processed/chunks.jsonl \
+  --collection-name ip_chunks \
+  --embedding-provider local \
+  --overwrite \
+  --report data/processed/milvus_report.json
+```
+
+Real Milvus mode requires a running Milvus instance, pymilvus installed, and real embeddings configured with `--embedding-provider openai-compatible` or `--embedding-provider local`.
+
+---
+
+## 9. Run queries
+
+### Single query CLI
+
+Only risk_analysis answers include Risk Level. Other answer types should be read as evidence-focused responses rather than overall risk classifications.
+
+```bash
+python scripts/08_run_query_cli.py \
+  "Which Nice classes are associated with the queried trademark evidence?" \
+  --duckdb-path data/processed/ip.duckdb \
+  --chunks-path data/processed/chunks.jsonl \
+  --output-json
+```
+
+```bash
+python scripts/08_run_query_cli.py \
+  "Summarize litigation evidence for an asserted patent." \
+  --duckdb-path data/processed/ip.duckdb \
+  --chunks-path data/processed/chunks.jsonl \
+  --output-json
+```
 
 ### BM25-only query without Milvus
 
 ```bash
 python scripts/run_hybrid_query.py \
-  --query "smart travel bag trademark risk" \
+  --query "smart travel bag trademark and patent risk" \
   --mode bm25_only \
   --top-k 10
 ```
-
-`bm25_only` reads the chunks JSONL and does not require Milvus, `pymilvus`, embeddings, `torch`, or `sentence-transformers`.
 
 ### Hybrid RRF query
 
 ```bash
 python scripts/run_hybrid_query.py \
-  --query "What trademark and patent risks should a seller consider for a smart travel bag product?" \
+  --query "What IP risks should a seller review for a smart travel bag product?" \
   --mode hybrid_rrf \
   --top-k 10 \
   --output-json
 ```
 
-Hybrid modes combine local BM25 with dense Milvus results and include compact hit previews plus `source_type_counts` and `source_subtype_counts` in JSON output.
-
-### Phase 2: Hybrid reranking
-
-`hybrid_rerank` now uses a real two-stage candidate pool:
-
-BM25 top `candidate_k` + Dense top `candidate_k` → RRF fusion top `candidate_k` → de-duplication → reranker → final top `top_k` evidence.
-
-`candidate_k` controls the candidate pool before reranking. `top_k` controls the final evidence count passed to deterministic answer synthesis. The `lexical` reranker is dependency-free and useful for smoke tests. The `local` cross-encoder reranker requires `sentence-transformers` and a working `torch` installation. This system supports retrieval and compliance research, but it is still not legal advice.
-
-Hybrid RRF baseline:
+### Hybrid rerank query
 
 ```bash
 python scripts/run_hybrid_query.py \
-  --query "What trademark and patent risks should a seller consider for a smart travel bag product?" \
-  --mode hybrid_rrf \
-  --top-k 8 \
-  --output-json
-```
-
-Hybrid rerank with the lexical reranker:
-
-```bash
-python scripts/run_hybrid_query.py \
-  --query "What trademark and patent risks should a seller consider for a smart travel bag product?" \
+  --query "What patent claim evidence is relevant to drone delivery control?" \
   --mode hybrid_rerank \
   --reranker-provider lexical \
   --candidate-k 50 \
@@ -407,48 +361,32 @@ python scripts/run_hybrid_query.py \
   --output-json
 ```
 
-Hybrid rerank with a local cross-encoder:
+---
 
-```bash
-python scripts/run_hybrid_query.py \
-  --query "What trademark and patent risks should a seller consider for a smart travel bag product?" \
-  --mode hybrid_rerank \
-  --reranker-provider local \
-  --reranker-model BAAI/bge-reranker-base \
-  --candidate-k 50 \
-  --top-k 8 \
-  --output-json
+## 10. GraphRAG
+
+The GraphRAG layer is intentionally lightweight. It uses a NetworkX graph to expand from entities such as companies, trademarks, patents, and litigation cases to nearby evidence. This is useful when the query mentions one entity but relevant evidence is connected through another entity.
+
+Typical pattern:
+
+```text
+entity mention -> graph lookup -> neighboring entities/evidence -> fusion with text retrieval -> reranked evidence
 ```
 
-### Troubleshooting
+Use GraphRAG as an evidence-expansion layer, not as a source of unsupported legal conclusions.
 
-* **`RAG_MILVUS_URI` missing**: set `export RAG_MILVUS_URI=/path/to/milvus.db`. `MILVUS_URI` is only a backward-compatible fallback.
-* **Milvus Lite collection released**: the runtime store calls `load_collection(collection_name=...)` before search in Lite mode and `collection.load()` in server mode.
-* **Malformed `metadata_json`**: retrieval maps empty metadata to `{}` and malformed metadata to `{ "_metadata_parse_error": true }` instead of crashing.
-* **Optional `pymilvus` missing**: install `pymilvus` for dense/hybrid Milvus retrieval, or run `--mode bm25_only` without Milvus.
-* **Optional `torch`/`sentence-transformers` DLL issue on Windows**: use `RERANKER_PROVIDER=noop` or `lexical` for baseline tests. Local cross-encoder reranking requires both `sentence-transformers` and a working `torch` installation.
-* **LLM API returns empty choices**: verify `OPENAI_API_KEY`, `OPENAI_BASE_URL`, and `LLM_MODEL`, then rerun `python scripts/test_llm_api.py`.
-* **Generated-file safety**: do not commit `data/`, `.env`, model weights, Milvus `.db` files, archives, or output artifacts.
+---
 
-### Legal disclaimer
+## 11. Evaluation and ablation
 
-This system supports retrieval and compliance research, but it is not legal advice.
-
-## Phase 4: Evaluation and agent-vs-basic experiments
-
-Phase 4 adds a reproducible evaluation framework for the experimental question: **does Agentic RAG improve retrieval and grounded answering compared with a non-agent basic RAG baseline?** The controlled comparison keeps the query set, chunks, collection name, retrieval mode, reranker, `top_k`, `candidate_k`, and optional LLM settings fixed; only the pipeline differs:
-
-- `basic_rag`: direct retrieval baseline without classification, planning, evidence evaluation, or follow-up retrieval.
-- `agentic`: normalize → classify → plan → retrieve → evaluate evidence → optional follow-up retrieval → rerank → answer.
-
-The tracked weak-label example dataset lives at `eval/queries_small.jsonl` so it is not hidden by ignored `data/` artifacts. It focuses on trademark, patent, and litigation evidence only; policy evidence is not required by default.
+This repository includes evaluation scripts and small tracked query sets for reproducible experiments. If you do not have a full labeled benchmark yet, treat the outputs as pipeline diagnostics rather than final claims about model quality.
 
 ### Retrieval evaluation
 
 ```bash
 python scripts/eval_retrieval.py \
   --eval-path eval/queries_small.jsonl \
-  --chunks-path data/processed/chunks_qa_300k.jsonl \
+  --chunks-path data/processed/chunks.jsonl \
   --modes bm25_only,hybrid_rrf,hybrid_rerank \
   --top-k-values 5,8,10 \
   --candidate-k 50 \
@@ -456,9 +394,21 @@ python scripts/eval_retrieval.py \
   --output-dir reports/eval_retrieval
 ```
 
-This writes `retrieval_results.jsonl`, `retrieval_summary.json`, `retrieval_summary.csv`, and `retrieval_summary.md`. `bm25_only` runs without Milvus; dense and hybrid modes require a configured vector backend for real experiments.
+Tracked or planned metrics include:
 
-### Agentic vs non-agent baseline without LLM
+| Metric | Meaning |
+|---|---|
+| `Precision@k` | fraction of retrieved evidence judged relevant |
+| `Recall@k` | fraction of expected relevant evidence retrieved |
+| `HitRate@k` | whether at least one relevant item appears in top-k |
+| `MRR@k` | reciprocal rank of first relevant item |
+| `nDCG@k` | ranking quality with graded or weak relevance labels |
+| `CitationCoverage` | share of final evidence referenced by the answer |
+| `ValidCitationRate` | share of cited evidence IDs that exist in the evidence manifest |
+
+No fixed Recall@k, nDCG, latency, or accuracy numbers are claimed in this README. Run the evaluation scripts on your own processed data and labeled query set before reporting results.
+
+### Agentic vs basic baseline
 
 ```bash
 python scripts/eval_agent_vs_basic.py \
@@ -471,144 +421,78 @@ python scripts/eval_agent_vs_basic.py \
   --output-dir reports/eval_agent_vs_basic_no_llm
 ```
 
-### Agentic vs non-agent baseline with LLM
+### Stage evaluation
 
 ```bash
-python scripts/eval_agent_vs_basic.py \
-  --eval-path eval/queries_small.jsonl \
-  --pipeline-modes basic_rag,agentic \
-  --retrieval-mode hybrid_rerank \
-  --reranker-provider lexical \
-  --candidate-k 50 \
-  --top-k 8 \
-  --use-llm \
-  --output-dir reports/eval_agent_vs_basic_llm
+python scripts/09_run_eval.py \
+  --eval-file tests/fixtures/e2e/eval/eval_queries.jsonl \
+  --output-dir data/eval \
+  --duckdb-path data/processed/ip.duckdb \
+  --chunks-path data/processed/chunks.jsonl
 ```
 
-The script does not hard-code an LLM provider, endpoint, or model. Without `--use-llm`, it uses deterministic grounded template answers so CI and local smoke tests do not require API keys.
-
-### Optional LLM judge
+### Ablation
 
 ```bash
-python scripts/eval_agent_vs_basic.py \
-  --eval-path eval/queries_small.jsonl \
-  --pipeline-modes basic_rag,agentic \
-  --retrieval-mode hybrid_rerank \
-  --reranker-provider lexical \
-  --candidate-k 50 \
-  --top-k 8 \
-  --use-llm \
-  --llm-judge \
-  --output-dir reports/eval_agent_vs_basic_judge
+python scripts/10_run_ablation.py \
+  --eval-file tests/fixtures/e2e/eval/eval_queries.jsonl \
+  --output-dir data/eval/ablation \
+  --duckdb-path data/processed/ip.duckdb \
+  --chunks-path data/processed/chunks.jsonl \
+  --experiments bm25_only,hybrid_rrf,no_reranker
 ```
 
-The LLM judge is optional and must return strict JSON scores for faithfulness, answer relevance, citation correctness, and completeness. Judge failures are recorded instead of failing the whole run.
+FaithfulnessProxy is a heuristic, not a human-level factuality evaluator.
 
-### Compare runs
+---
 
-```bash
-python scripts/compare_eval_runs.py \
-  --inputs reports/eval_agent_vs_basic_no_llm/agent_vs_basic_summary.json reports/eval_agent_vs_basic_llm/agent_vs_basic_summary.json \
-  --labels no_llm,llm \
-  --output-dir reports/comparisons
-```
+## 12. Real-data readiness checklist
 
-### Metric meanings and caveats
+Before running on full datasets:
 
-- `Precision@k`, `Recall@k`, `HitRate@k`, `MRR@k`, and `nDCG@k` measure retrieval ranking quality. When strong relevant document or chunk IDs are absent, weak relevance uses expected source types plus `must_contain_any` terms; missing labels return `None` and are ignored in averages.
-- `CitationCoverage` measures how much final evidence is cited at least once.
-- `ValidCitationRate` measures whether cited `[E#]` identifiers exist in the evidence manifest.
-- `GroundedCitationRate` is a token-overlap proxy for cited sentence support.
-- `FaithfulnessProxy` and `AnswerRelevanceProxy` are heuristic metrics useful for development comparisons, but they are not substitutes for human or legal review.
-- `TraceCompleteness`, `ToolCallCount`, `FollowupQueryCount`, and `AgenticProcessValid` measure whether the observed process matches the expected basic or agentic workflow.
-- `LatencyMs` and output count metrics help compare efficiency and cost tradeoffs.
+- [ ] Install the required optional extras for your chosen retrieval mode.
+- [ ] Set local paths for `TRADEMARK_RAW_DIR`, `PATENT_RAW_DIR`, and `LITIGATION_RAW_DIR`.
+- [ ] Parse trademark, patent, and litigation sources into normalized JSONL.
+- [ ] Inspect parser reports for missing identifiers, empty text, or unexpected schemas.
+- [ ] Combine normalized records into `all_docs.jsonl`.
+- [ ] Build chunks and inspect the chunk report.
+- [ ] Build DuckDB and verify exact lookups.
+- [ ] Run Milvus dry-run mode to validate chunk loading and embedding dimensions.
+- [ ] Start Milvus and build a real vector index with real embeddings.
+- [ ] Run representative queries and inspect citations.
+- [ ] Run evaluation and ablation on labeled or weak-labeled queries.
 
-This system is not legal advice, and evaluation outputs should not be treated as legal conclusions.
+---
 
-## Phase 5: Production runtime hardening
+## 13. Troubleshooting
 
-Phase 5 turns the runtime into a production-like Agentic RAG demo. Interactive chat now builds expensive resources once at startup: chunks for BM25, Milvus/Milvus Lite connections for dense retrieval, embedding providers when needed, rerankers, `AgenticRAG`, and the optional LLM chat client. Each user question reuses that runtime instead of rebuilding retrieval resources.
+| Symptom | What to check |
+|---|---|
+| Dense retrieval returns poor matches | Confirm you are not using fake embeddings. Fake embeddings are only for smoke runs. |
+| Milvus indexing appears to work but no vectors are searchable | Confirm you did not only run dry-run mode. Dry-run mode does not insert into Milvus. |
+| Milvus connection fails | Start the service with `docker compose up -d`, verify URI, and install `pymilvus`. |
+| Local reranker fails to import | Use `--reranker-provider lexical` or install local reranker dependencies. |
+| Exact lookup misses known IDs | Inspect normalized JSONL fields and rebuild DuckDB. |
+| Evaluation metrics are `None` or sparse | Add stronger labels or expected IDs to the evaluation query file. |
+| Answers sound too definitive | Treat generated output as evidence summaries only; this system is not legal advice. |
 
-The default runtime mode is `agentic`: classify → plan → retrieve → evaluate → optional follow-up retrieval → final rerank → grounded answer. `basic_rag` remains available only as the controlled non-agent baseline for experiments. Hybrid modes require both chunks JSONL for BM25 and Milvus or Milvus Lite for dense retrieval. The project focuses on trademark, patent, and litigation evidence; policy evidence is not required by default. Generated answers are retrieval-grounded marketplace compliance research aids and are not legal advice.
+---
 
-LLM support is provider-neutral. Configure an OpenAI-compatible endpoint with `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL`; `OPENAI_*` variables are accepted for backward compatibility. No vendor endpoint or model is hard-coded. Use `--llm-provider template` for offline demos and CI.
+## 14. Known limitations
 
-### Phase 5 commands
+- The system is designed for evidence retrieval and grounded QA, not legal representation or final legal conclusions.
+- Trademark XML field coverage may need expansion for additional USPTO variants.
+- Patent TSV column variants are handled best-effort and may need adaptation for unseen releases.
+- Litigation data normalization depends on the shape and completeness of docket reports.
+- Fake embeddings are not semantic and should not be used for real retrieval quality assessment.
+- Milvus real mode requires external service availability and compatible embedding dimensions.
+- GraphRAG expansion depends on extracted entity quality and graph construction choices.
+- Reranker quality depends on the selected provider and model.
+- Evaluation quality depends on the availability of reliable relevance labels.
+- FaithfulnessProxy is a heuristic and is not a substitute for human review.
 
-Offline demo:
+---
 
-```bash
-python scripts/run_agentic_rag.py \
-  --demo \
-  --pipeline-mode agentic \
-  --retrieval-mode hybrid_rerank \
-  --reranker-provider lexical \
-  --query "What trademark and patent risks should a seller consider for a smart travel bag product?" \
-  --use-llm \
-  --llm-provider template \
-  --show-trace
-```
+## 15. Safety and interpretation
 
-BM25-only with chunks:
-
-```bash
-python scripts/run_agentic_rag.py \
-  --chunks-path data/processed/chunks_qa_300k.jsonl \
-  --pipeline-mode agentic \
-  --retrieval-mode bm25_only \
-  --query "Find patent claims related to drone delivery control." \
-  --show-trace
-```
-
-True hybrid with Milvus:
-
-```bash
-python scripts/run_agentic_rag.py \
-  --chunks-path data/processed/chunks_qa_300k.jsonl \
-  --use-milvus \
-  --collection-name ip_chunks_qa_300k \
-  --pipeline-mode agentic \
-  --retrieval-mode hybrid_rerank \
-  --reranker-provider lexical \
-  --candidate-k 50 \
-  --top-k 8 \
-  --query "What trademark and patent risks should a seller consider for a smart travel bag product?" \
-  --use-llm \
-  --show-trace
-```
-
-Interactive chat:
-
-```bash
-python scripts/chat_agentic_rag.py \
-  --chunks-path data/processed/chunks_qa_300k.jsonl \
-  --use-milvus \
-  --collection-name ip_chunks_qa_300k \
-  --pipeline-mode agentic \
-  --retrieval-mode hybrid_rerank \
-  --reranker-provider lexical \
-  --candidate-k 50 \
-  --top-k 8 \
-  --use-llm \
-  --show-sources \
-  --show-trace
-```
-
-Agent vs basic evaluation:
-
-```bash
-python scripts/eval_agent_vs_basic.py \
-  --chunks-path data/processed/chunks_qa_300k.jsonl \
-  --use-milvus \
-  --collection-name ip_chunks_qa_300k \
-  --pipeline-modes basic_rag,agentic \
-  --retrieval-mode hybrid_rerank \
-  --reranker-provider lexical \
-  --candidate-k 50 \
-  --top-k 8 \
-  --output-dir reports/eval_agent_vs_basic
-```
-
-### Phase 5 troubleshooting
-
-Common configuration issues include missing `LLM_API_KEY`, missing `LLM_MODEL`, unsupported `LLM_PROVIDER`, empty LLM choices/content, missing Milvus URI, hybrid mode missing BM25 chunks, hybrid mode missing dense vector store, and local reranker dependency failures. Chat should no longer be slow because runtime construction is reused across questions. No policy evidence is required by default.
+Use this project to organize and retrieve evidence from trademark, patent, and litigation sources. Do not treat the generated answers as legal opinions. Important business or legal decisions should be reviewed by qualified professionals using the cited source material.
