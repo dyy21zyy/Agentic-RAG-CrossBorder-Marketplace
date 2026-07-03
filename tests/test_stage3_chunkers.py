@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from crossborder_agentic_rag.ingestion.chunkers import chunk_document, chunk_documents, chunk_policy
+from crossborder_agentic_rag.ingestion.chunkers import MAX_LITIGATION_DOCKET_CHUNKS, chunk_document, chunk_documents, chunk_policy, chunk_trademark
 from crossborder_agentic_rag.ingestion.io_utils import read_chunks_jsonl, read_documents_jsonl, write_chunks_jsonl
 from crossborder_agentic_rag.schemas.documents import NormalizedDocument
 from crossborder_agentic_rag.schemas.evidence import EvidenceChunk
@@ -50,10 +50,16 @@ def test_chunk_document_rejects_unknown_source_type():
         chunk_document(doc)
 
 
-def test_trademark_chunks_include_identity_class_goods_design_record():
+def test_trademark_chunks_include_identity_class_goods_design_without_record_by_default():
     chunks = chunk_document(by_type("trademark"))
-    assert {"trademark_identity", "trademark_class", "trademark_goods_services", "trademark_design", "trademark_record"} <= subtypes(chunks)
+    assert {"trademark_identity", "trademark_class", "trademark_goods_services", "trademark_design"} <= subtypes(chunks)
+    assert "trademark_record" not in subtypes(chunks)
     assert any("MERCEDES" in c.content for c in chunks)
+
+
+def test_trademark_record_can_be_enabled_explicitly():
+    chunks = chunk_trademark(by_type("trademark"), include_full_record=True)
+    assert "trademark_record" in subtypes(chunks)
 
 
 def test_trademark_design_chunk_preserves_design_codes_and_pseudo_marks():
@@ -143,6 +149,39 @@ def test_litigation_chunks_include_phase2_metadata():
     assert any("US1234567" in c.metadata["entity_mentions"] for c in chunks if c.source_subtype == "litigation_patent")
 
 
+
+def test_compact_metadata_excludes_large_nested_fields():
+    doc = by_type("litigation")
+    chunks = chunk_document(doc)
+    forbidden = {"case", "documents", "parties", "patents", "timeline", "source_files"}
+    assert chunks
+    assert all(not (forbidden & set(chunk.metadata)) for chunk in chunks)
+
+
+def test_litigation_docket_chunks_are_capped():
+    doc = by_type("litigation")
+    md = dict(doc.metadata)
+    md["documents"] = [
+        {"doc_number": str(i), "short_description": f"doc {i}", "long_description": "short", "doc_date_filed": "2020-01-01"}
+        for i in range(MAX_LITIGATION_DOCKET_CHUNKS + 7)
+    ]
+    capped_doc = NormalizedDocument(doc.doc_id, doc.source_type, doc.title, doc.content, md)
+    docket_chunks = [c for c in chunk_document(capped_doc) if c.source_subtype == "litigation_docket"]
+    assert len(docket_chunks) == MAX_LITIGATION_DOCKET_CHUNKS
+
+
+def test_streaming_builder_outputs_same_chunks_as_normal_builder_for_sample(tmp_path):
+    out, rep = tmp_path / "stream_chunks.jsonl", tmp_path / "stream_report.json"
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "05_build_chunks_streaming.py"), "--input", str(FIXTURE), "--output", str(out), "--report", str(rep), "--progress-every", "1"], text=True, capture_output=True)
+    assert r.returncode == 0, r.stderr
+    stream_chunks = [c.to_dict() for c in read_chunks_jsonl(out)]
+    normal_chunks = [c.to_dict() for c in chunk_documents(docs())]
+    report = json.loads(rep.read_text(encoding="utf-8"))
+    assert stream_chunks == normal_chunks
+    assert report["chunks_written"] == len(normal_chunks)
+    assert report["failed_documents_count"] == 0
+    assert report["approximate_output_size_bytes"] > 0
+
 def test_write_and_read_chunks_jsonl_roundtrip(tmp_path):
     chunks = chunk_documents(docs())
     out = tmp_path / "chunks.jsonl"
@@ -158,7 +197,7 @@ def test_build_chunks_script_outputs_jsonl_and_report(tmp_path):
     report = json.loads(rep.read_text(encoding="utf-8"))
     assert chunks and report["documents_seen"] == 4 and report["documents_chunked"] == 4
     assert report["chunks_written"] == len(chunks)
-    assert report["chunks_by_source_type"]["trademark"] >= 5
+    assert report["chunks_by_source_type"]["trademark"] >= 4
 
 
 def test_build_chunks_script_fails_on_empty_input_without_allow_empty(tmp_path):

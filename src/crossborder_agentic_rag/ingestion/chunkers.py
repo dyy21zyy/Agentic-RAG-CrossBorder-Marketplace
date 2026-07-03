@@ -60,6 +60,53 @@ def stable_chunk_id(doc_id: str, source_subtype: str, index: int | str) -> str:
     return f"{safe_doc_id}:{safe_subtype}:{safe_index}"
 
 
+COMPACT_METADATA_FIELDS = {
+    "source_file", "source_path", "source_type", "source_subtype",
+    "parent_id", "context_path", "partition", "entity_mentions",
+    "serial_number", "registration_number", "word_mark", "filing_date",
+    "registration_date", "status_code", "nice_class", "nice_classes",
+    "goods_services", "design_search_codes", "pseudo_marks",
+    "patent_id", "patent_number", "claim_number", "claim_type",
+    "is_independent", "part_index",
+    "case_row_id", "case_number", "district_id", "court_name",
+    "case_name", "date_filed", "date_closed", "case_cause",
+    "doc_number", "doc_date_filed", "short_description",
+    "party_type", "name", "name_long",
+}
+
+MAX_COMPACT_LIST_ITEMS = 50
+MAX_COMPACT_STRING_LENGTH = 2000
+MAX_LITIGATION_DOCKET_CHUNKS = 5
+MAX_LITIGATION_TIMELINE_EVENTS = 20
+INCLUDE_FULL_TRADEMARK_RECORD_DEFAULT = False
+MAX_DOCKET_LONG_DESCRIPTION_LENGTH = 1000
+
+
+def _compact_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return value if len(value) <= MAX_COMPACT_STRING_LENGTH else value[:MAX_COMPACT_STRING_LENGTH] + "…"
+    if isinstance(value, int | float | bool) or value is None:
+        return value
+    if isinstance(value, list):
+        compact = []
+        for item in value[:MAX_COMPACT_LIST_ITEMS]:
+            if isinstance(item, str | int | float | bool) or item is None:
+                compact.append(_compact_value(item))
+        return compact
+    return None
+
+
+def compact_metadata(md: dict[str, Any]) -> dict[str, Any]:
+    """Return small retrieval/citation metadata without nested raw records."""
+    compact: dict[str, Any] = {}
+    for key in COMPACT_METADATA_FIELDS:
+        if key in md:
+            value = _compact_value(md[key])
+            if value not in (None, "", [], {}):
+                compact[key] = value
+    return compact
+
+
 def make_chunk(
     doc: NormalizedDocument,
     source_subtype: str,
@@ -71,9 +118,9 @@ def make_chunk(
     context_path: str | None = None,
     entity_mentions: list[str] | None = None,
 ) -> EvidenceChunk:
-    metadata = dict(doc.metadata)
+    metadata = compact_metadata(doc.metadata)
     if metadata_extra:
-        metadata.update(metadata_extra)
+        metadata.update(compact_metadata(metadata_extra))
     metadata["parent_id"] = parent_id if parent_id is not None else metadata.get("parent_id", doc.doc_id)
     metadata["context_path"] = context_path if context_path is not None else metadata.get("context_path", f"{doc.source_type} > {doc.doc_id}")
     metadata["partition"] = metadata.get("partition", partition_for_source(doc.source_type))
@@ -111,7 +158,7 @@ def chunk_documents(docs: list[NormalizedDocument]) -> list[EvidenceChunk]:
     return [chunk for doc in docs for chunk in chunk_document(doc)]
 
 
-def chunk_trademark(doc: NormalizedDocument) -> list[EvidenceChunk]:
+def chunk_trademark(doc: NormalizedDocument, include_full_record: bool = INCLUDE_FULL_TRADEMARK_RECORD_DEFAULT) -> list[EvidenceChunk]:
     md = doc.metadata
     chunks: list[EvidenceChunk] = []
     serial = md.get("serial_number")
@@ -139,8 +186,9 @@ def chunk_trademark(doc: NormalizedDocument) -> list[EvidenceChunk]:
         content = f"Design search codes: {', '.join(map(str, design_codes))}\nPseudo marks: {', '.join(map(str, pseudo))}\nDrawing/design: {drawing or ''}"
         _append(chunks, make_chunk(doc, "trademark_design", f"{label} design", content, {"design_search_codes": design_codes, "pseudo_marks": pseudo, "serial_number": serial, "registration_number": reg, "word_mark": word}, "design", parent_id=parent_id, context_path=f"Trademark > {label} > Design", entity_mentions=_entity_mentions(*base_mentions, classes)))
 
-    _append(chunks, make_chunk(doc, "trademark_record", f"{label} record", doc.content or identity, {"serial_number": serial, "registration_number": reg, "word_mark": word}, "record", parent_id=parent_id, context_path=f"Trademark > {label} > Full Record", entity_mentions=_entity_mentions(*base_mentions, classes)))
-    return chunks or [make_chunk(doc, "trademark_record", doc.title, doc.content or doc.title, index="fallback", parent_id=parent_id, context_path=f"Trademark > {label} > Full Record", entity_mentions=_entity_mentions(*base_mentions, classes))]
+    if include_full_record:
+        _append(chunks, make_chunk(doc, "trademark_record", f"{label} record", doc.content or identity, {"serial_number": serial, "registration_number": reg, "word_mark": word}, "record", parent_id=parent_id, context_path=f"Trademark > {label} > Full Record", entity_mentions=_entity_mentions(*base_mentions, classes)))
+    return chunks or [make_chunk(doc, "trademark_record", doc.title, doc.content or doc.title, {"serial_number": serial, "registration_number": reg, "word_mark": word}, index="fallback", parent_id=parent_id, context_path=f"Trademark > {label} > Full Record", entity_mentions=_entity_mentions(*base_mentions, classes))]
 
 
 _CLAIM_RE = re.compile(r"(?ms)(?:^|\n)\s*(?:Claim\s*)?(\d+)\s*[\.)]\s+(.*?)(?=(?:\n\s*(?:Claim\s*)?\d+\s*[\.)]\s+)|\Z)")
@@ -247,7 +295,7 @@ def chunk_litigation(doc: NormalizedDocument) -> list[EvidenceChunk]:
     base = {"case_row_id": case.get("case_row_id"), "case_number": case_number, "district_id": district_id}
     base_mentions = _entity_mentions(case_number, case_name, district_id)
     summary = f"Case number: {case_number}\nCase name: {case_name}\nCourt name: {case.get('court_name')}\nDistrict id: {district_id}\nDate filed: {case.get('date_filed')}\nDate closed: {case.get('date_closed')}\nCase cause: {case.get('case_cause')}"
-    _append(chunks, make_chunk(doc, "litigation_case_summary", f"{case_name or doc.title} summary", summary, {**base, "court_name": case.get("court_name"), "case_name": case_name, "date_filed": case.get("date_filed"), "date_closed": case.get("date_closed"), "source_files": md.get("source_files")}, "summary", parent_id=parent_id, context_path=f"Litigation > {case_label} > Case Summary", entity_mentions=base_mentions))
+    _append(chunks, make_chunk(doc, "litigation_case_summary", f"{case_name or doc.title} summary", summary, {**base, "court_name": case.get("court_name"), "case_name": case_name, "date_filed": case.get("date_filed"), "date_closed": case.get("date_closed"), "case_cause": case.get("case_cause")}, "summary", parent_id=parent_id, context_path=f"Litigation > {case_label} > Case Summary", entity_mentions=base_mentions))
     for i, party in enumerate(_as_list(md.get("parties"))):
         if isinstance(party, dict):
             party_name = party.get("name")
@@ -256,18 +304,21 @@ def chunk_litigation(doc: NormalizedDocument) -> list[EvidenceChunk]:
     for i, patent in enumerate(_as_list(md.get("patents"))):
         pnum = patent.get("patent_number") or patent.get("patent") if isinstance(patent, dict) else patent
         content = f"Patent number: {pnum}\nCase number: {case_number}\nCase name: {case_name}\nCase type: {case.get('case_type')}\nDate filed: {case.get('date_filed')}"
-        _append(chunks, make_chunk(doc, "litigation_patent", f"{case_name} patent {pnum}", content, {**base, "patent": patent, "patent_number": pnum}, i, parent_id=parent_id, context_path=f"Litigation > {case_label} > Patent {pnum}", entity_mentions=_entity_mentions(*base_mentions, pnum)))
-    for i, docket in enumerate(_as_list(md.get("documents"))):
+        _append(chunks, make_chunk(doc, "litigation_patent", f"{case_name} patent {pnum}", content, {**base, "patent_number": pnum}, i, parent_id=parent_id, context_path=f"Litigation > {case_label} > Patent {pnum}", entity_mentions=_entity_mentions(*base_mentions, pnum)))
+    for i, docket in enumerate(_as_list(md.get("documents"))[:MAX_LITIGATION_DOCKET_CHUNKS]):
         if isinstance(docket, dict):
             doc_number = docket.get("doc_number")
             date_filed = docket.get("doc_date_filed") or docket.get("date_filed")
-            content = f"Doc number: {doc_number}\nShort description: {docket.get('short_description')}\nLong description: {docket.get('long_description')}\nDocument filed date: {date_filed}\nCase number: {case_number}"
+            long_description = normalize_whitespace(docket.get("long_description"))
+            if len(long_description) > MAX_DOCKET_LONG_DESCRIPTION_LENGTH:
+                long_description = ""
+            content = f"Doc number: {doc_number}\nShort description: {docket.get('short_description')}\nLong description: {long_description}\nDocument filed date: {date_filed}\nCase number: {case_number}"
             _append(chunks, make_chunk(doc, "litigation_docket", f"{case_name} docket {doc_number}", content, {**base, "doc_number": doc_number, "doc_date_filed": date_filed, "short_description": docket.get("short_description")}, i, parent_id=parent_id, context_path=f"Litigation > {case_label} > Docket {doc_number}", entity_mentions=base_mentions))
     timeline = _as_list(md.get("timeline"))
     if timeline:
         rows = []
-        for event in sorted(timeline, key=lambda e: e.get("date", "") if isinstance(e, dict) else str(e)):
+        for event in sorted(timeline, key=lambda e: e.get("date", "") if isinstance(e, dict) else str(e))[:MAX_LITIGATION_TIMELINE_EVENTS]:
             rows.append(f"{event.get('date')}: {event.get('event_type')} - {event.get('description')}" if isinstance(event, dict) else str(event))
-        _append(chunks, make_chunk(doc, "litigation_timeline", f"{case_name} timeline", "\n".join(rows), {**base, "timeline": timeline}, "timeline", parent_id=parent_id, context_path=f"Litigation > {case_label} > Timeline", entity_mentions=base_mentions))
+        _append(chunks, make_chunk(doc, "litigation_timeline", f"{case_name} timeline", "\n".join(rows), {**base}, "timeline", parent_id=parent_id, context_path=f"Litigation > {case_label} > Timeline", entity_mentions=base_mentions))
     return chunks or [make_chunk(doc, "litigation_case_summary", doc.title, doc.content or doc.title, base, "fallback", parent_id=parent_id, context_path=f"Litigation > {case_label} > Case Summary", entity_mentions=base_mentions)]
 
