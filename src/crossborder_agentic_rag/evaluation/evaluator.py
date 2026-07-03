@@ -12,6 +12,7 @@ class EvalResult:
     citations: list[str] = field(default_factory=list)
     retrieved_chunk_ids: list[str] = field(default_factory=list)
     retrieved_doc_ids: list[str] = field(default_factory=list)
+    retrieved_contexts: list[str] = field(default_factory=list)
     predicted_source_types: list[str] = field(default_factory=list)
     expected_source_types: list[str] = field(default_factory=list)
     predicted_tools: list[str] = field(default_factory=list)
@@ -91,6 +92,7 @@ def evaluate_agent(agent: Any, examples: list[EvalExample], top_ks: list[int] | 
     for ex in examples:
         start=time.perf_counter(); state=agent.run(ex.query); latency=(time.perf_counter()-start)*1000
         chunks=_chunks(state); chunk_ids=[getattr(c,"chunk_id","") for c in chunks]; doc_ids=[getattr(c,"doc_id","") for c in chunks]
+        retrieved_contexts=[getattr(c,"content","") for c in chunks if getattr(c,"content","")]
         srcs=_uniq([getattr(c,"source_type","") for c in chunks]); citations=list(getattr(state,"citations",[]) or [])
         answer=getattr(state,"answer","") or ""; route=getattr(state,"retrieval_route","") or ""; ans_type=getattr(state,"expected_answer_type","") or ""
         rel=ex.relevant_chunk_ids or ex.relevant_doc_ids; got=chunk_ids if ex.relevant_chunk_ids else doc_ids
@@ -103,7 +105,7 @@ def evaluate_agent(agent: Any, examples: list[EvalExample], top_ks: list[int] | 
             m[f"MRR@{k}"]=mrr_at_k(got, rel, k); m[f"AP@{k}"]=average_precision_at_k(got, rel, k); m[f"nDCG@{k}"]=ndcg_at_k(got, rel, k); m[f"graded_nDCG@{k}"]=ndcg_at_k_graded(got, ex.relevance_grades, k)
         req=ex.relevant_chunk_ids or ex.relevant_doc_ids
         m.update({"ExactMatch":exact_match(answer, ex.gold_answer),"TokenF1":token_f1(answer, ex.gold_answer),"CitationCoverage":citation_coverage(citations, req),"GroundedCitationRate":grounded_citation_rate(citations, chunk_ids+doc_ids),"FaithfulnessProxy":faithfulness_proxy(answer, [getattr(c,"content","") for c in chunks], citations),"RoutingCorrect":1.0 if route==ex.expected_route else 0.0,"SourceTypeStrict":source_type_accuracy_strict([srcs],[ex.expected_source_types]),"SourceTypeLoose":source_type_accuracy_loose([srcs],[ex.expected_source_types]),"ToolCallAccuracy":tool_call_accuracy(predicted_tools, ex.expected_tools),"ToolCallF1":tool_call_f1(predicted_tools, ex.expected_tools),"PartitionAccuracy":partition_accuracy(predicted_partitions, ex.expected_partitions),"LatencyMs":latency,"LatencyTotalMs":total_ms,"LatencyRetrievalMs":retrieval_ms,"LatencyGenerationMs":generation_ms})
-        results.append(EvalResult(ex.query_id,ex.query,route,ex.expected_route,ans_type,ex.expected_answer_type,answer,ex.gold_answer,citations,chunk_ids,doc_ids,srcs,ex.expected_source_types,predicted_tools,ex.expected_tools,predicted_partitions,ex.expected_partitions,breakdown,m,latency,list(getattr(state,"trace",[]) or []),dict(ex.metadata)))
+        results.append(EvalResult(ex.query_id,ex.query,route,ex.expected_route,ans_type,ex.expected_answer_type,answer,ex.gold_answer,citations,chunk_ids,doc_ids,retrieved_contexts,srcs,ex.expected_source_types,predicted_tools,ex.expected_tools,predicted_partitions,ex.expected_partitions,breakdown,m,latency,list(getattr(state,"trace",[]) or []),dict(ex.metadata)))
     summary_metrics=_aggregate(results)
     summary_metrics.update({
         "LatencyP50": safe_round(percentile([r.metrics.get("LatencyMs",0.0) for r in results],50)),
