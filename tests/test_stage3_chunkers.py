@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from crossborder_agentic_rag.ingestion.chunkers import MAX_LITIGATION_DOCKET_CHUNKS, chunk_document, chunk_documents, chunk_policy, chunk_trademark
+from crossborder_agentic_rag.ingestion.chunkers import MAX_LITIGATION_DOCKET_CHUNKS, chunk_document, chunk_documents, chunk_policy, chunk_trademark, make_chunk
 from crossborder_agentic_rag.ingestion.io_utils import read_chunks_jsonl, read_documents_jsonl, write_chunks_jsonl
 from crossborder_agentic_rag.schemas.documents import NormalizedDocument
 from crossborder_agentic_rag.schemas.evidence import EvidenceChunk
@@ -156,6 +156,30 @@ def test_compact_metadata_excludes_large_nested_fields():
     forbidden = {"case", "documents", "parties", "patents", "timeline", "source_files"}
     assert chunks
     assert all(not (forbidden & set(chunk.metadata)) for chunk in chunks)
+
+
+def test_make_chunk_does_not_copy_arbitrary_large_metadata():
+    doc = NormalizedDocument(
+        "tm:large-metadata",
+        "trademark",
+        "Large metadata",
+        "content",
+        {
+            "serial_number": "123",
+            "word_mark": "COMPACT",
+            "raw_row": {"large": "x" * 10000},
+            "original_text": "duplicated source text" * 1000,
+            "documents": [{"doc_number": str(i)} for i in range(10)],
+            "unexpected_large_field": ["x" * 1000 for _ in range(10)],
+        },
+    )
+    chunk = make_chunk(doc, "trademark_identity", "Compact identity", "content")
+    assert chunk.metadata["serial_number"] == "123"
+    assert chunk.metadata["word_mark"] == "COMPACT"
+    assert "raw_row" not in chunk.metadata
+    assert "original_text" not in chunk.metadata
+    assert "documents" not in chunk.metadata
+    assert "unexpected_large_field" not in chunk.metadata
 
 
 def test_litigation_docket_chunks_are_capped():
