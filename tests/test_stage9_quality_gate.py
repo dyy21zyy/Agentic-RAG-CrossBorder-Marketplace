@@ -59,7 +59,7 @@ def test_readme_mentions_faithfulness_proxy_is_heuristic() -> None:
 
 
 def test_all_scripts_have_main() -> None:
-    assert len(SCRIPT_FILES) == 10
+    assert len(SCRIPT_FILES) == 11
     for path in SCRIPT_FILES:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         assert any(isinstance(node, ast.FunctionDef) and node.name == "main" for node in tree.body), path
