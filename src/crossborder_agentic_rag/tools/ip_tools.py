@@ -143,8 +143,10 @@ def build_ip_tools(retriever: Any, embedding_provider: Any = None, duckdb_store:
         if graph_retriever is None:
             return _json({"tool_name": "graph_rag_tool", "available": False, "evidence": [], "message": "GraphRAG index not available"})
         try:
-            hits = graph_retriever.retrieve(query)
-            return _json({"tool_name": "graph_rag_tool", "available": True, "evidence": [_chunk_to_dict(h) for h in hits]})
+            result = graph_retriever.retrieve(query)
+            if isinstance(result, dict):
+                return _json({"tool_name": "graph_rag_tool", "available": True, "evidence": [], **result})
+            return _json({"tool_name": "graph_rag_tool", "available": True, "evidence": [_chunk_to_dict(h) for h in result]})
         except Exception as exc:
             return _json({"tool_name": "graph_rag_tool", "available": False, "evidence": [], "error": str(exc)})
 
