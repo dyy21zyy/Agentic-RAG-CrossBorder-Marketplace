@@ -16,10 +16,15 @@ class EvalExample:
     relevant_doc_ids: list[str] = field(default_factory=list)
     relevant_chunk_ids: list[str] = field(default_factory=list)
     expected_source_types: list[str] = field(default_factory=list)
+    relevance_grades: dict[str, int] = field(default_factory=dict)
+    expected_tools: list[str] = field(default_factory=list)
+    expected_partitions: list[str] = field(default_factory=list)
+    reference_contexts: list[str] = field(default_factory=list)
+    answer_key_points: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
 _FIELDS=set(EvalExample.__dataclass_fields__)
-_LISTS={"relevant_doc_ids","relevant_chunk_ids","expected_source_types"}
+_LISTS={"relevant_doc_ids","relevant_chunk_ids","expected_source_types","expected_tools","expected_partitions","reference_contexts","answer_key_points"}
 
 def _example_from_dict(data:dict[str,Any], line_no:int)->EvalExample:
     if not data.get("query_id"): raise ValueError(f"Missing query_id on line {line_no}")
@@ -28,6 +33,7 @@ def _example_from_dict(data:dict[str,Any], line_no:int)->EvalExample:
     for k,v in data.items():
         if k not in _FIELDS: meta[k]=v
     kwargs={k:data.get(k) for k in _FIELDS if k not in {"metadata"}}
+    kwargs["relevance_grades"] = dict(kwargs.get("relevance_grades") or {})
     for k in _LISTS:
         kwargs[k]=list(kwargs.get(k) or [])
     for k,v in list(kwargs.items()):

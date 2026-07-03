@@ -131,3 +131,39 @@ def test_no_duplicate_module_paths_created():
     assert not (ROOT/"src/crossborder_agentic_rag/eval").exists()
     assert not (ROOT/"src/crossborder_agentic_rag/evaluations").exists()
     assert not (ROOT/"src/crossborder_agentic_rag/benchmark").exists()
+
+def test_eval_dataset_loader_accepts_phase9_fields(tmp_path):
+    p=tmp_path/"eval.jsonl"
+    p.write_text(json.dumps({"query_id":"q-new","query":"x","relevance_grades":{"a":2},"expected_tools":["trademark_search_tool"],"expected_partitions":["trademark_db"],"reference_contexts":["ctx"],"answer_key_points":["point"]})+"\n", encoding="utf-8")
+    ex=load_eval_jsonl(p)[0]
+    assert ex.relevance_grades == {"a": 2}
+    assert ex.expected_tools == ["trademark_search_tool"]
+    assert ex.expected_partitions == ["trademark_db"]
+    assert ex.reference_contexts == ["ctx"]
+    assert ex.answer_key_points == ["point"]
+
+def test_graded_ndcg_tool_and_partition_metrics():
+    assert ndcg_at_k_graded(["a","b","c"], {"a":2,"c":1}, 3) > 0
+    expected=["trademark_search_tool","patent_search_tool"]
+    predicted=["trademark_search_tool","patent_search_tool","graph_rag_tool"]
+    assert tool_call_accuracy(predicted, expected) == 1.0
+    assert tool_call_f1(predicted, expected) > 0
+    assert partition_accuracy(["trademark_db","patent_db","litigation_db"], ["trademark_db","patent_db"]) == 1.0
+    assert percentile([1,2,3,4], 50) == pytest.approx(2.5)
+
+def test_evaluate_agent_handles_examples_without_qrels():
+    ex=[EvalExample(query_id="no-qrels", query="Explain trademark infringement", expected_tools=["trademark_search_tool"], expected_partitions=["trademark_db"])]
+    class ToolAgent(FakeAgent):
+        def run(self,q):
+            st=super().run(q); st.tool_calls=[{"tool":"trademark_search_tool"}]; st.partitions_used=["trademark_db"]; st.latency_breakdown={"total_ms": 12, "bm25_ms": 3, "llm_ms": 4}; return st
+    res, summary=evaluate_agent(ToolAgent(), ex)
+    assert res[0].metrics["Recall@5"] == 0.0
+    assert summary.metrics["ToolCallAccuracy"] == 1.0
+    assert "LatencyP95" in summary.metrics
+
+def test_eval_cli_normal_mode_does_not_silently_use_demoagent(tmp_path):
+    missing=tmp_path/"missing_chunks.jsonl"
+    cp=subprocess.run([sys.executable,"scripts/09_run_eval.py","--eval-file","tests/fixtures/eval/eval_queries.jsonl","--output-dir",str(tmp_path),"--chunks-path",str(missing)],cwd=ROOT,text=True,capture_output=True)
+    assert cp.returncode != 0
+    assert "Real agent runtime is not available" in cp.stderr
+    assert "DemoAgent" not in cp.stderr
