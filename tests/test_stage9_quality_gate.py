@@ -118,7 +118,12 @@ def test_gitignore_generated_artifacts() -> None:
 def test_no_generated_files_committed_under_data() -> None:
     data_dir = ROOT / "data"
     if data_dir.exists():
-        assert [p for p in data_dir.rglob("*") if p.is_file()] == []
+        allowed_templates = {ROOT / "data/eval/golden_queries_30.jsonl"}
+        assert [
+            p
+            for p in data_dir.rglob("*")
+            if p.is_file() and p not in allowed_templates
+        ] == []
 
 
 def test_pyproject_has_optional_milvus_extra() -> None:
