@@ -21,6 +21,9 @@ def parse_args(argv=None):
     p.add_argument("--report",default="data/processed/milvus_report.json")
     p.add_argument("--allow-empty",action="store_true")
     p.add_argument("--embedding-provider",default=os.getenv("EMBEDDING_PROVIDER","fake"),help="Embedding provider to use: fake, openai-compatible, or local. Fake is allowed only with --dry-run.")
+    g=p.add_mutually_exclusive_group()
+    g.add_argument("--verify-count", dest="verify_count", action="store_true", default=True, help="Verify persisted Milvus row count after indexing (default).")
+    g.add_argument("--no-verify-count", dest="verify_count", action="store_false", help="Skip persisted row-count verification.")
     return p.parse_args(argv)
 
 def run(args)->None:
@@ -31,7 +34,7 @@ def run(args)->None:
     provider=build_embedding_provider(args.embedding_provider)
     if not args.dry_run and isinstance(provider, FakeEmbeddingProvider):
         raise RuntimeError("Real Milvus mode requires real embeddings; FakeEmbeddingProvider is only allowed with --dry-run. Set --embedding-provider openai-compatible or local after configuring its dependencies.")
-    report={"input":str(inp),"collection_name":args.collection_name,"dry_run":args.dry_run,"chunks_seen":len(chunks),"chunks_indexed":0,"embedding_provider":provider.__class__.__name__,"embedding_dim":0,"source_type_counts":dict(Counter(c.source_type for c in chunks)),"source_subtype_counts":dict(Counter(c.source_subtype for c in chunks)),"milvus_inserted":0,"warnings":[],"failed_chunks":[]}
+    report={"input":str(inp),"collection_name":args.collection_name,"dry_run":args.dry_run,"chunks_seen":len(chunks),"chunks_indexed":0,"embedding_provider":provider.__class__.__name__,"embedding_dim":0,"source_type_counts":dict(Counter(c.source_type for c in chunks)),"source_subtype_counts":dict(Counter(c.source_subtype for c in chunks)),"milvus_inserted":0,"actual_row_count":None,"verify_count":args.verify_count,"warnings":[],"failed_chunks":[]}
     if args.dry_run:
         indexed=0
         for i in range(0,len(chunks),args.batch_size):
@@ -43,18 +46,37 @@ def run(args)->None:
     store=None; inserted=0
     for i in range(0,len(chunks),args.batch_size):
         batch=chunks[i:i+args.batch_size]
-        vectors=provider.embed_documents(_texts(batch))
+        end=i+len(batch)
+        print(f"Processing batch {i//args.batch_size+1} ({i}-{end-1}) of {len(chunks)} chunks.")
+        try:
+            vectors=provider.embed_documents(_texts(batch))
+        except Exception as exc:
+            report["failed_chunks"].append({"start":i,"end":end,"error":str(exc)})
+            write_report(report,args.report)
+            raise
         if vectors and not report["embedding_dim"]:
             report["embedding_dim"]=len(vectors[0])
             store=MilvusChunkStore(uri=os.getenv("MILVUS_URI","http://localhost:19530"),token=os.getenv("MILVUS_TOKEN"),collection_name=args.collection_name,embedding_dim=report["embedding_dim"],overwrite=args.overwrite)
             store.connect(); store.ensure_collection(); store.create_indexes()
         if store is not None:
-            inserted+=store.insert_chunks(batch,vectors)
+            try:
+                inserted+=store.insert_chunks(batch,vectors)
+            except Exception as exc:
+                report["failed_chunks"].append({"start":i,"end":end,"error":str(exc)})
+                report["chunks_indexed"]=inserted; report["milvus_inserted"]=inserted
+                write_report(report,args.report)
+                raise
             print(f"Inserted {inserted}/{len(chunks)} chunks into Milvus collection {args.collection_name}.")
     if store is None:
         store=MilvusChunkStore(uri=os.getenv("MILVUS_URI","http://localhost:19530"),token=os.getenv("MILVUS_TOKEN"),collection_name=args.collection_name,embedding_dim=0,overwrite=args.overwrite)
         store.connect(); store.ensure_collection(); store.create_indexes()
-    store.flush(); report["chunks_indexed"]=inserted; report["milvus_inserted"]=inserted; write_report(report,args.report); print(f"Inserted {inserted} chunks into Milvus collection {args.collection_name}.")
+    store.flush(); report["chunks_indexed"]=inserted; report["milvus_inserted"]=inserted
+    if args.verify_count:
+        actual=store.row_count(); report["actual_row_count"]=actual
+        if actual != inserted:
+            msg=f"Milvus row count mismatch: actual_row_count={actual}, milvus_inserted={inserted}"
+            report["warnings"].append(msg); write_report(report,args.report); print(msg, file=sys.stderr); raise RuntimeError(msg)
+    store.close(); write_report(report,args.report); print(f"Inserted {inserted} chunks into Milvus collection {args.collection_name} (actual_row_count={report['actual_row_count']}).")
 
 def main(argv=None)->int:
     args=parse_args(argv)

@@ -1,11 +1,12 @@
 from __future__ import annotations
-import importlib.util, json, subprocess, sys, types
+import importlib.util, json, os, subprocess, sys, types
 from pathlib import Path
 import pytest
 from crossborder_agentic_rag.ingestion.io_utils import read_chunks_jsonl
 from crossborder_agentic_rag.llm.embeddings import FakeEmbeddingProvider, OpenAICompatibleEmbeddingProvider, LocalSentenceTransformerEmbeddingProvider
 from crossborder_agentic_rag.retrieval import LocalBM25Retriever, rrf_fusion, LexicalReranker, NoOpReranker, LocalCrossEncoderReranker, APIRerankerPlaceholder, HybridRetriever
 from crossborder_agentic_rag.storage.milvus_store import MilvusChunkStore, partition_for_source
+from crossborder_agentic_rag.schemas.evidence import EvidenceChunk
 ROOT=Path(__file__).resolve().parents[1]; FIX=ROOT/'tests/fixtures/retrieval/sample_chunks.jsonl'
 def chunks(): return read_chunks_jsonl(FIX)
 def test_fake_embedding_still_deterministic(): assert FakeEmbeddingProvider(4).embed_query('x')==FakeEmbeddingProvider(4).embed_query('x')
@@ -91,3 +92,77 @@ def test_future_stage_scripts_still_raise_not_implemented():
 def test_no_duplicate_module_paths_created():
     forbidden=['src/crossborder_agentic_rag/vectorstore','src/crossborder_agentic_rag/vector_store','src/crossborder_agentic_rag/retriever','src/crossborder_agentic_rag/retrieval/hybrid.py','src/crossborder_agentic_rag/storage/milvus.py']
     assert not [p for p in forbidden if (ROOT/p).exists()]
+
+def test_pymilvus_import_ignores_lite_milvus_uri_env(monkeypatch):
+    import crossborder_agentic_rag.storage.milvus_store as ms
+    monkeypatch.setenv('MILVUS_URI','data/processed/milvus_lite/ip_rag_milvus.db')
+    fake=types.SimpleNamespace(MilvusClient=lambda **k: None, DataType=types.SimpleNamespace(VARCHAR='VARCHAR', FLOAT_VECTOR='FLOAT_VECTOR'))
+    monkeypatch.setitem(sys.modules,'pymilvus',fake)
+    assert ms._load_pymilvus() is fake
+    assert os.environ['MILVUS_URI'].endswith('.db')
+
+
+def test_varchar_truncates_by_utf8_bytes_without_splitting():
+    from crossborder_agentic_rag.storage.milvus_store import _varchar
+    out=_varchar('ééé',5)
+    assert out=='éé' and len(out.encode('utf-8'))<=5
+
+
+def test_milvus_lite_overwrite_once_and_truncates_rows(monkeypatch, tmp_path):
+    class DT: VARCHAR='VARCHAR'; FLOAT_VECTOR='FLOAT_VECTOR'
+    class Schema:
+        def __init__(self): self.fields=[]
+        def add_field(self, **kw): self.fields.append(kw)
+    class Index:
+        def add_index(self, **kw): pass
+    class Client:
+        collections={}
+        drops=0
+        def __init__(self, **kw): pass
+        def has_collection(self, name): return name in self.collections
+        def drop_collection(self, collection_name): self.collections.pop(collection_name, None); self.__class__.drops+=1
+        def create_schema(self, **kw): return Schema()
+        def prepare_index_params(self): return Index()
+        def create_collection(self, collection_name, schema, index_params=None): self.collections[collection_name]=[]
+        def insert(self, collection_name, data):
+            for row in data:
+                assert len(row['content'].encode('utf-8'))<=65535
+                assert len(row['word_mark'].encode('utf-8'))<=512
+            self.collections[collection_name].extend(data)
+        def flush(self, *a, **k): pass
+        def load_collection(self, **kw): pass
+        def get_collection_stats(self, collection_name): return {'row_count': len(self.collections[collection_name])}
+    fake=types.SimpleNamespace(MilvusClient=Client,DataType=DT)
+    monkeypatch.setitem(sys.modules,'pymilvus',fake)
+    uri=str(tmp_path/'x.db')
+    store=MilvusChunkStore(uri,None,'c',3,overwrite=True); store.connect(); store.ensure_collection()
+    c=EvidenceChunk('id1','doc','trademark','sub','t','x'*70000,{'word_mark':'你'*400})
+    store.insert_chunks([c],[[0,0,0]])
+    c2=EvidenceChunk('id2','doc','patent','sub','t','ok',{})
+    store.insert_chunks([c2],[[0,0,0]])
+    assert store.row_count()==2 and Client.drops==0
+
+
+def test_build_index_detects_count_mismatch(monkeypatch, tmp_path):
+    import importlib.util
+    spec=importlib.util.spec_from_file_location('build_milvus_index', ROOT/'scripts/07_build_milvus_index.py')
+    mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    class Provider(FakeEmbeddingProvider): pass
+    class Store:
+        def __init__(self, *a, **k): pass
+        def connect(self): pass
+        def ensure_collection(self): pass
+        def create_indexes(self): pass
+        def insert_chunks(self, chunks, vectors): return len(chunks)
+        def flush(self): pass
+        def row_count(self): return 1
+        def close(self): pass
+    monkeypatch.setattr(mod, 'build_embedding_provider', lambda name: Provider(3))
+    monkeypatch.setattr(mod, 'FakeEmbeddingProvider', type('OtherFake',(object,),{}))
+    monkeypatch.setattr(mod, 'MilvusChunkStore', Store)
+    r=tmp_path/'report.json'
+    args=mod.parse_args(['--input',str(FIX),'--embedding-provider','local','--report',str(r),'--batch-size','4'])
+    with pytest.raises(RuntimeError, match='row count mismatch'):
+        mod.run(args)
+    data=json.loads(r.read_text())
+    assert data['actual_row_count']==1 and data['milvus_inserted']==8

@@ -43,14 +43,20 @@ def _compact(c):
 def main(argv=None):
     _load_env(); args=parse_args(argv)
     if not args.query: raise ValueError("query is required")
-    chunks=[]; retriever=None; embedding=None
+    chunks=[]; retriever=None; embedding=None; warnings=[]
     if args.demo:
         chunks=_demo_chunks(); embedding=FakeEmbeddingProvider(); retriever=BM25RetrieverAdapter(chunks)
     elif args.chunks_path:
         path=Path(args.chunks_path)
         if not path.is_file(): raise FileNotFoundError(f"Chunks path does not exist: {path}")
-        chunks=read_chunks_jsonl(path); embedding=build_embedding_provider(args.embedding_provider); retriever=BM25RetrieverAdapter(chunks) if args.retrieval_mode=="bm25_only" else HybridRetriever(embedding_provider=embedding,bm25_retriever=LocalBM25Retriever(chunks))
+        chunks=read_chunks_jsonl(path); embedding=build_embedding_provider(args.embedding_provider)
+        if args.use_milvus:
+            dim=len(embedding.embed_query("dimension probe")); store=MilvusChunkStore(os.getenv("MILVUS_URI","http://localhost:19530"), os.getenv("MILVUS_TOKEN"), args.collection_name, dim); store.connect(); store.ensure_collection(); retriever=HybridRetriever(embedding_provider=embedding,bm25_retriever=LocalBM25Retriever(chunks), vector_store=store)
+        else:
+            retriever=BM25RetrieverAdapter(chunks) if args.retrieval_mode=="bm25_only" else HybridRetriever(embedding_provider=embedding,bm25_retriever=LocalBM25Retriever(chunks))
     elif args.use_milvus:
+        if args.retrieval_mode in {"bm25_only","hybrid_rrf","hybrid_rerank"}:
+            raise RuntimeError(f"retrieval-mode {args.retrieval_mode!r} requires --chunks-path to build the BM25 retriever; use --retrieval-mode dense_only with --use-milvus to query Milvus without local chunks.")
         embedding=build_embedding_provider(args.embedding_provider); dim=len(embedding.embed_query("dimension probe")); store=MilvusChunkStore(os.getenv("MILVUS_URI","http://localhost:19530"), os.getenv("MILVUS_TOKEN"), args.collection_name, dim); store.connect(); store.ensure_collection(); retriever=HybridRetriever(embedding_provider=embedding, vector_store=store)
     else:
         raise RuntimeError("No retrieval backend configured. Provide --chunks-path or --use-milvus, or pass --demo explicitly.")
@@ -60,7 +66,7 @@ def main(argv=None):
         duck=DuckDBStore(args.duckdb_path)
     state=AgenticRAG(duckdb_store=duck,retriever=retriever,embedding_provider=embedding if args.retrieval_mode!="bm25_only" and not args.demo else None,max_iterations=args.max_iterations,default_top_k=args.top_k).run(args.query)
     if args.output_json:
-        print(json.dumps({"demo_mode": bool(args.demo), "query":state.query,"normalized_query":state.normalized_query,"query_type":state.query_type,"expected_answer_type":state.expected_answer_type,"retrieval_route":state.retrieval_route,"answer":state.answer,"citations":state.citations,"sql_results":state.sql_results,"source_chunks":[_compact(c) for c in state.retrieved_evidence],"evidence_gaps":state.evidence_gaps,"iterations":state.iterations,"trace":state.trace}, ensure_ascii=False, indent=2))
+        print(json.dumps({"demo_mode": bool(args.demo), "query":state.query,"normalized_query":state.normalized_query,"query_type":state.query_type,"expected_answer_type":state.expected_answer_type,"retrieval_route":state.retrieval_route,"answer":state.answer,"citations":state.citations,"sql_results":state.sql_results,"source_chunks":[_compact(c) for c in state.retrieved_evidence],"evidence_gaps":state.evidence_gaps + warnings,"warnings":warnings,"iterations":state.iterations,"trace":state.trace}, ensure_ascii=False, indent=2))
     else:
         if args.demo: print("[demo mode]")
         print(state.answer)
