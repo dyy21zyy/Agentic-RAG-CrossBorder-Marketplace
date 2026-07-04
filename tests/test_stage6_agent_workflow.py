@@ -104,3 +104,12 @@ def test_risk_analysis_does_not_require_policy_by_default():
     c = classify_query('Can I sell a phone case using the MERCEDES logo?')
     ev = evaluate_evidence(plan('Can I sell a phone case using the MERCEDES logo?'), [chunks()[1]])
     assert 'Missing policy evidence' not in ev.evidence_gaps
+
+def test_query_cli_hybrid_milvus_without_chunks_explains_bm25_requirement():
+    cp=subprocess.run([sys.executable,'scripts/08_run_query_cli.py','q','--use-milvus','--retrieval-mode','hybrid_rrf'],cwd=ROOT,text=True,capture_output=True)
+    assert cp.returncode!=0 and 'requires --chunks-path to build the BM25 retriever' in cp.stderr
+
+def test_query_cli_dense_only_milvus_path_does_not_require_chunks_path():
+    text=(ROOT/'scripts/08_run_query_cli.py').read_text(encoding='utf-8')
+    assert 'args.retrieval_mode in {"bm25_only","hybrid_rrf","hybrid_rerank"}' in text
+    assert '--retrieval-mode dense_only with --use-milvus' in text
