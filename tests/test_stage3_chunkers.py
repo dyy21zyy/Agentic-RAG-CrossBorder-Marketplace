@@ -101,6 +101,23 @@ def test_patent_claim_chunks_preserve_claim_number():
     assert all(c.metadata["patent_id"] == "US1234567" for c in claims)
 
 
+def test_patent_claim_duplicate_claim_numbers_have_unique_chunk_ids():
+    doc = NormalizedDocument(
+        "patent:dup-claims",
+        "patent",
+        "Duplicate claims",
+        "content",
+        {"patent_id": "US-DUP", "claims": "1. First claim text.\n1. Duplicate claim number text."},
+    )
+    claims = [c for c in chunk_document(doc) if c.source_subtype == "patent_claim"]
+    assert [c.metadata["claim_number"] for c in claims] == ["1", "1"]
+    assert len({c.chunk_id for c in claims}) == len(claims)
+    assert [c.chunk_id for c in claims] == [
+        "patent:dup-claims:patent_claim:claim-1-0",
+        "patent:dup-claims:patent_claim:claim-1-1",
+    ]
+
+
 def test_patent_claim_chunks_include_phase2_metadata_and_subtype_unchanged():
     claims = [c for c in chunk_document(by_type("patent")) if c.source_subtype == "patent_claim"]
     assert claims
@@ -222,6 +239,24 @@ def test_build_chunks_script_outputs_jsonl_and_report(tmp_path):
     assert chunks and report["documents_seen"] == 4 and report["documents_chunked"] == 4
     assert report["chunks_written"] == len(chunks)
     assert report["chunks_by_source_type"]["trademark"] >= 4
+
+
+def test_build_chunks_report_detects_duplicate_chunk_ids():
+    spec = importlib.util.spec_from_file_location("build_chunks", ROOT / "scripts" / "05_build_chunks.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    report = {"warnings": []}
+    duplicated = [
+        EvidenceChunk("dup", "d1", "patent", "patent_claim", "t1", "c1", {}),
+        EvidenceChunk("dup", "d1", "patent", "patent_claim", "t2", "c2", {}),
+        EvidenceChunk("unique", "d2", "patent", "patent_claim", "t3", "c3", {}),
+    ]
+    mod.add_duplicate_chunk_id_stats(report, duplicated)
+    assert report["total_chunks"] == 3
+    assert report["unique_chunk_ids"] == 2
+    assert report["duplicate_chunk_ids"] == 1
+    assert report["duplicate_chunk_id_examples"] == [{"chunk_id": "dup", "count": 2}]
+    assert report["warnings"]
 
 
 def test_build_chunks_script_fails_on_empty_input_without_allow_empty(tmp_path):

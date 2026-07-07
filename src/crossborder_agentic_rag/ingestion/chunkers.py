@@ -226,8 +226,8 @@ def chunk_patent(doc: NormalizedDocument) -> list[EvidenceChunk]:
     claims = _split_claims(str(claims_text or ""))
     if claims_text and not claims:
         claims = [("unknown", str(claims_text))]
-    for claim_no, text in claims:
-        _append(chunks, make_chunk(doc, "patent_claim", f"Patent {patent_id} claim {claim_no}", f"Patent {patent_id} Claim {claim_no}:\n{text}", {"patent_id": patent_id, "claim_number": claim_no, "source_file": md.get("source_file"), "source_path": md.get("source_path")}, f"claim-{claim_no}", parent_id=parent_id, context_path=f"Patent > {patent_id} > Claim {claim_no}", entity_mentions=_entity_mentions(*base_mentions, claim_no)))
+    for i, (claim_no, text) in enumerate(claims):
+        _append(chunks, make_chunk(doc, "patent_claim", f"Patent {patent_id} claim {claim_no}", f"Patent {patent_id} Claim {claim_no}:\n{text}", {"patent_id": patent_id, "claim_number": claim_no, "source_file": md.get("source_file"), "source_path": md.get("source_path")}, f"claim-{claim_no}-{i}", parent_id=parent_id, context_path=f"Patent > {patent_id} > Claim {claim_no}", entity_mentions=_entity_mentions(*base_mentions, claim_no)))
 
     summary = _first(md, "brief_summary", "summary")
     if summary:
@@ -321,4 +321,3 @@ def chunk_litigation(doc: NormalizedDocument) -> list[EvidenceChunk]:
             rows.append(f"{event.get('date')}: {event.get('event_type')} - {event.get('description')}" if isinstance(event, dict) else str(event))
         _append(chunks, make_chunk(doc, "litigation_timeline", f"{case_name} timeline", "\n".join(rows), {**base}, "timeline", parent_id=parent_id, context_path=f"Litigation > {case_label} > Timeline", entity_mentions=base_mentions))
     return chunks or [make_chunk(doc, "litigation_case_summary", doc.title, doc.content or doc.title, base, "fallback", parent_id=parent_id, context_path=f"Litigation > {case_label} > Case Summary", entity_mentions=base_mentions)]
-
