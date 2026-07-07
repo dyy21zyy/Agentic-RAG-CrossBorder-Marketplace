@@ -165,4 +165,32 @@ def test_build_index_detects_count_mismatch(monkeypatch, tmp_path):
     with pytest.raises(RuntimeError, match='row count mismatch'):
         mod.run(args)
     data=json.loads(r.read_text())
-    assert data['actual_row_count']==1 and data['milvus_inserted']==8
+    assert data['actual_row_count']==1 and data['milvus_inserted_attempted']==8 and data['unique_chunk_ids']==8
+
+
+def test_build_index_verify_count_compares_actual_to_unique_chunk_ids(monkeypatch, tmp_path):
+    import importlib.util
+    spec=importlib.util.spec_from_file_location('build_milvus_index_unique', ROOT/'scripts/07_build_milvus_index.py')
+    mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    class Provider(FakeEmbeddingProvider): pass
+    class Store:
+        def __init__(self, *a, **k): pass
+        def connect(self): pass
+        def ensure_collection(self): pass
+        def create_indexes(self): pass
+        def insert_chunks(self, chunks, vectors): return len(chunks)
+        def flush(self): pass
+        def row_count(self): return 1
+        def close(self): pass
+    c=EvidenceChunk('dup','doc','patent','patent_claim','t','c',{})
+    inp=tmp_path/'chunks.jsonl'
+    inp.write_text("\n".join(json.dumps(c.to_dict()) for _ in range(2))+"\n", encoding='utf-8')
+    monkeypatch.setattr(mod, 'build_embedding_provider', lambda name: Provider(3))
+    monkeypatch.setattr(mod, 'FakeEmbeddingProvider', type('OtherFake',(object,),{}))
+    monkeypatch.setattr(mod, 'MilvusChunkStore', Store)
+    r=tmp_path/'report.json'
+    args=mod.parse_args(['--input',str(inp),'--embedding-provider','local','--report',str(r)])
+    mod.run(args)
+    data=json.loads(r.read_text())
+    assert data['chunks_seen']==2 and data['unique_chunk_ids']==1 and data['actual_row_count']==1
+    assert data['milvus_inserted_attempted']==2 and data['duplicate_chunk_ids']==1 and data['warnings']

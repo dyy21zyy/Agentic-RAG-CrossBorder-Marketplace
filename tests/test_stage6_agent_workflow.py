@@ -113,3 +113,4 @@ def test_query_cli_dense_only_milvus_path_does_not_require_chunks_path():
     text=(ROOT/'scripts/08_run_query_cli.py').read_text(encoding='utf-8')
     assert 'args.retrieval_mode in {"bm25_only","hybrid_rrf","hybrid_rerank"}' in text
     assert '--retrieval-mode dense_only with --use-milvus' in text
+    assert 'retrieval_mode=args.retrieval_mode' in text

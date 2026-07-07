@@ -64,7 +64,7 @@ def main(argv=None):
     if args.duckdb_path:
         if not Path(args.duckdb_path).exists(): raise FileNotFoundError(f"DuckDB path does not exist: {args.duckdb_path}")
         duck=DuckDBStore(args.duckdb_path)
-    state=AgenticRAG(duckdb_store=duck,retriever=retriever,embedding_provider=embedding if args.retrieval_mode!="bm25_only" and not args.demo else None,max_iterations=args.max_iterations,default_top_k=args.top_k).run(args.query)
+    state=AgenticRAG(duckdb_store=duck,retriever=retriever,embedding_provider=embedding if args.retrieval_mode!="bm25_only" and not args.demo else None,max_iterations=args.max_iterations,default_top_k=args.top_k,retrieval_mode=args.retrieval_mode).run(args.query)
     if args.output_json:
         print(json.dumps({"demo_mode": bool(args.demo), "query":state.query,"normalized_query":state.normalized_query,"query_type":state.query_type,"expected_answer_type":state.expected_answer_type,"retrieval_route":state.retrieval_route,"answer":state.answer,"citations":state.citations,"sql_results":state.sql_results,"source_chunks":[_compact(c) for c in state.retrieved_evidence],"evidence_gaps":state.evidence_gaps + warnings,"warnings":warnings,"iterations":state.iterations,"trace":state.trace}, ensure_ascii=False, indent=2))
     else:

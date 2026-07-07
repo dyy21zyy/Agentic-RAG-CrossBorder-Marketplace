@@ -21,11 +21,33 @@ def _empty_report(input_path: str | Path, output_path: str | Path) -> dict:
         "documents_seen": 0,
         "documents_chunked": 0,
         "chunks_written": 0,
+        "total_chunks": 0,
+        "unique_chunk_ids": 0,
+        "duplicate_chunk_ids": 0,
+        "duplicate_chunk_id_examples": [],
         "chunks_by_source_type": {},
         "chunks_by_source_subtype": {},
         "failed_documents": [],
         "warnings": [],
     }
+
+
+def add_duplicate_chunk_id_stats(report: dict, chunks: list) -> None:
+    counts = Counter(chunk.chunk_id for chunk in chunks)
+    duplicate_examples = [
+        {"chunk_id": chunk_id, "count": count}
+        for chunk_id, count in counts.most_common()
+        if count > 1
+    ][:20]
+    report["total_chunks"] = len(chunks)
+    report["unique_chunk_ids"] = len(counts)
+    report["duplicate_chunk_ids"] = len(duplicate_examples)
+    report["duplicate_chunk_id_examples"] = duplicate_examples
+    if duplicate_examples:
+        duplicate_extra = len(chunks) - len(counts)
+        report["warnings"].append(
+            f"Input generated duplicate chunk_id values: duplicate_id_count={len(duplicate_examples)}, duplicate_extra={duplicate_extra}."
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -34,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", required=True)
     parser.add_argument("--report", required=True)
     parser.add_argument("--allow-empty", action="store_true")
+    parser.add_argument("--fail-on-duplicate-chunk-id", action="store_true")
     args = parser.parse_args(argv)
 
     input_path = Path(args.input)
@@ -70,6 +93,11 @@ def main(argv: list[str] | None = None) -> int:
         by_source_type.update(chunk.source_type for chunk in doc_chunks)
         by_subtype.update(chunk.source_subtype for chunk in doc_chunks)
 
+    add_duplicate_chunk_id_stats(report, chunks)
+    if report["duplicate_chunk_ids"] and args.fail_on_duplicate_chunk_id:
+        write_report(report, args.report)
+        print(f"Duplicate chunk_id values detected; see report: {args.report}", file=sys.stderr)
+        return 1
     report["chunks_written"] = write_chunks_jsonl(chunks, args.output)
     report["chunks_by_source_type"] = dict(sorted(by_source_type.items()))
     report["chunks_by_source_subtype"] = dict(sorted(by_subtype.items()))
