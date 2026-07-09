@@ -66,12 +66,14 @@ def classify_query(query: str) -> QueryClassification:
         return QueryClassification(q, "mixed_search", "litigation_summary", "mixed", ["litigation"], rationale="exact entity plus explanation")
     if "patent" in lower and re.search(r"\bus\d+", lower) and _has(lower, "explain", "summarize", "claims"):
         return QueryClassification(q, "mixed_search", "patent_explanation", "mixed", ["patent"], rationale="exact entity plus explanation")
+    litigation_terms = ("litigation", "lawsuit", "sued", "docket", "case number", "case numbers", "parties", "asserted patent", "asserted patents", "docket event", "docket events")
+    if _has(lower, *litigation_terms):
+        return QueryClassification(q, "litigation_summary", "litigation_summary", "hybrid", ["litigation"], rationale="litigation semantic question")
+
     if "patent" in lower or "claim" in lower or "invention" in lower or "utility" in lower:
         return QueryClassification(q, "patent_explanation", "patent_explanation", "hybrid", ["patent"], rationale="patent semantic question")
     if "trademark" in lower or "mark" in lower or "brand" in lower or "logo" in lower:
         return QueryClassification(q, "trademark_explanation", "trademark_explanation", "hybrid", ["trademark"], rationale="trademark semantic question")
-    if "litigation" in lower or "lawsuit" in lower or "sued" in lower:
-        return QueryClassification(q, "litigation_summary", "litigation_summary", "hybrid", ["litigation"], rationale="litigation semantic question")
     if "compare" in lower or "difference" in lower:
         return QueryClassification(q, "comparison", "comparison_answer", "hybrid", [], rationale="comparison question")
     return QueryClassification(q, "general_ip_question", "general_answer", "hybrid", [], rationale="general semantic question")

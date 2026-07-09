@@ -23,10 +23,6 @@ def _empty_report(input_path: str | Path, output_path: str | Path) -> dict:
         "documents_seen": 0,
         "documents_chunked": 0,
         "chunks_written": 0,
-        "total_chunks": 0,
-        "unique_chunk_ids": 0,
-        "duplicate_chunk_ids": 0,
-        "duplicate_chunk_id_examples": [],
         "failed_documents_count": 0,
         "failed_documents": [],
         "chunks_by_source_type": {},
@@ -47,7 +43,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--report", required=True)
     parser.add_argument("--progress-every", type=int, default=10_000)
     parser.add_argument("--allow-empty", action="store_true")
-    parser.add_argument("--fail-on-duplicate-chunk-id", action="store_true")
     args = parser.parse_args(argv)
 
     input_path = Path(args.input)
@@ -59,7 +54,6 @@ def main(argv: list[str] | None = None) -> int:
 
     by_source_type: Counter[str] = Counter()
     by_subtype: Counter[str] = Counter()
-    chunk_id_counts: Counter[str] = Counter()
     failed: list[dict] = []
     total_bytes = 0
 
@@ -78,7 +72,6 @@ def main(argv: list[str] | None = None) -> int:
                     out_fh.write(payload)
                     total_bytes += len(payload.encode("utf-8"))
                     report["chunks_written"] += 1
-                    chunk_id_counts[chunk.chunk_id] += 1
                     by_source_type[chunk.source_type] += 1
                     by_subtype[chunk.source_subtype] += 1
             except Exception as exc:  # pragma: no cover - defensive CLI reporting
@@ -97,15 +90,6 @@ def main(argv: list[str] | None = None) -> int:
     report["failed_documents"] = failed
     report["chunks_by_source_type"] = dict(sorted(by_source_type.items()))
     report["chunks_by_source_subtype"] = dict(sorted(by_subtype.items()))
-    duplicate_examples = [{"chunk_id": cid, "count": count} for cid, count in chunk_id_counts.most_common() if count > 1][:20]
-    report["total_chunks"] = report["chunks_written"]
-    report["unique_chunk_ids"] = len(chunk_id_counts)
-    report["duplicate_chunk_ids"] = len(duplicate_examples)
-    report["duplicate_chunk_id_examples"] = duplicate_examples
-    if duplicate_examples:
-        report["warnings"].append(
-            f"Input generated duplicate chunk_id values: duplicate_id_count={len(duplicate_examples)}, duplicate_extra={report['chunks_written'] - len(chunk_id_counts)}."
-        )
     docs_seen = report["documents_seen"] or 0
     chunks_written = report["chunks_written"] or 0
     report["average_chunks_per_document"] = chunks_written / docs_seen if docs_seen else 0.0
@@ -114,9 +98,6 @@ def main(argv: list[str] | None = None) -> int:
     report["average_bytes_per_chunk"] = total_bytes / chunks_written if chunks_written else 0.0
     report["average_bytes_per_document"] = total_bytes / docs_seen if docs_seen else 0.0
     write_report(report, args.report)
-    if report["duplicate_chunk_ids"] and args.fail_on_duplicate_chunk_id:
-        print(f"Duplicate chunk_id values detected; see report: {args.report}", file=sys.stderr)
-        return 1
     print(f"Chunked {report['documents_chunked']}/{report['documents_seen']} documents into {report['chunks_written']} chunks.")
     print(f"Output: {args.output}")
     print(f"Report: {args.report}")
