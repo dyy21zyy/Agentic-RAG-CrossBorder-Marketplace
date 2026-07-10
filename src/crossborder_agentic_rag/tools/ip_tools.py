@@ -151,9 +151,69 @@ def build_ip_tools(retriever: Any, embedding_provider: Any = None, duckdb_store:
             return _json({"tool_name": "graph_rag_tool", "available": False, "evidence": [], "error": str(exc)})
 
     return [
-        Tool.from_function(source_tool("trademark_search_tool", "trademark"), name="trademark_search_tool", description="Search only trademark evidence for the query."),
-        Tool.from_function(source_tool("patent_search_tool", "patent"), name="patent_search_tool", description="Search only patent evidence for the query."),
-        Tool.from_function(source_tool("litigation_search_tool", "litigation"), name="litigation_search_tool", description="Search only litigation evidence for the query."),
-        Tool.from_function(duckdb_run, name="duckdb_lookup_tool", description="Run structured exact DuckDB lookups for registration number, word mark, patent id/number, or case number."),
-        Tool.from_function(graph_run, name="graph_rag_tool", description="Search GraphRAG relationships when the graph index is available."),
+        Tool.from_function(
+            source_tool("trademark_search_tool", "trademark"),
+            name="trademark_search_tool",
+            description=(
+                "Use this tool for trademark-related evidence retrieval. "
+                "Best for questions about word marks, brand names, logos, trademark similarity, "
+                "counterfeit risk, unauthorized brand use, Nice classes, goods/services, "
+                "registration records, serial numbers, and trademark ownership. "
+                "Input should be a natural-language search query. "
+                "Output contains trademark evidence chunks with chunk_id, doc_id, source_type, "
+                "metadata, content, and retrieval score."
+            ),
+        ),
+        Tool.from_function(
+            source_tool("patent_search_tool", "patent"),
+            name="patent_search_tool",
+            description=(
+                "Use this tool for patent-related evidence retrieval. "
+                "Best for questions about patent claims, product technical features, inventions, "
+                "utility patents, design patents, claim infringement, functional similarity, "
+                "and whether a product may overlap with existing US patent claims. "
+                "Input should describe the product, feature, or patent concern. "
+                "Output contains patent evidence chunks with chunk_id, doc_id, source_type, "
+                "metadata, content, and retrieval score."
+            ),
+        ),
+        Tool.from_function(
+            source_tool("litigation_search_tool", "litigation"),
+            name="litigation_search_tool",
+            description=(
+                "Use this tool for patent or trademark litigation evidence retrieval. "
+                "Best for questions about lawsuits, docket records, cases, plaintiffs, defendants, "
+                "parties, asserted patents, case numbers, litigation history, companies being sued, "
+                "or whether a product/company/brand is connected to IP disputes. "
+                "Input should be a natural-language litigation or case search query. "
+                "Output contains litigation evidence chunks with chunk_id, doc_id, source_type, "
+                "metadata, content, and retrieval score."
+            ),
+        ),
+        Tool.from_function(
+            duckdb_run,
+            name="duckdb_lookup_tool",
+            description=(
+                "Use this tool for exact structured lookup in DuckDB. "
+                "Best when the query contains exact identifiers or fields such as registration number, "
+                "serial number, word mark, patent id, patent number, case number, Nice class, "
+                "goods/services, party name, or other structured metadata. "
+                "Prefer this tool over semantic retrieval when the user asks for exact field values, "
+                "exact records, or identifier-based lookup. "
+                "Output contains structured SQL lookup results and missing-field information."
+            ),
+        ),
+        Tool.from_function(
+            graph_run,
+            name="graph_rag_tool",
+            description=(
+                "Use this tool for GraphRAG entity-relation expansion. "
+                "Best for multi-hop or relationship questions such as company to trademark, "
+                "company to litigation case, case to patent, party to asserted patent, "
+                "trademark to owner, patent to claim, or entity-neighborhood exploration. "
+                "Use this tool when relevant evidence may be connected through entities rather than "
+                "direct lexical or semantic text matches. "
+                "Output contains graph-expanded evidence or relationship information when available."
+            ),
+        ),
     ]
