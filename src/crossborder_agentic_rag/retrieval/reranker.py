@@ -1,6 +1,8 @@
-"""Reranking implementations."""
 from __future__ import annotations
 import os
+import sys
+
+"""Reranking implementations."""
 from abc import ABC, abstractmethod
 from crossborder_agentic_rag.schemas.evidence import EvidenceChunk
 from crossborder_agentic_rag.retrieval.bm25 import tokenize
@@ -39,7 +41,16 @@ class LocalCrossEncoderReranker(BaseReranker):
         self.model_name=model_name or os.getenv("RERANKER_MODEL") or "BAAI/bge-reranker-base"
         try:
             from sentence_transformers import CrossEncoder
-            self.model=CrossEncoder(self.model_name)
+            device = os.getenv("RERANKER_DEVICE")
+            if not device:
+                try:
+                    import torch
+                    device = "cuda" if torch.cuda.is_available() else "cpu"
+                except Exception:
+                    device = "cpu"
+            self.device = device
+            self.model = CrossEncoder(self.model_name, device=device)
+            print(f"[reranker] loaded {self.model_name} on {device}", file=sys.stderr)
         except Exception as exc:
             raise ImportError(self.MESSAGE) from exc
     def rerank(self,query:str,candidates:list[EvidenceChunk],top_k:int)->list[EvidenceChunk]:

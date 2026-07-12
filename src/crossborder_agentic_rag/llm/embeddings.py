@@ -1,5 +1,8 @@
-"""Embedding provider interfaces and implementations."""
 from __future__ import annotations
+import os
+import sys
+
+"""Embedding provider interfaces and implementations."""
 import hashlib, math, os
 from abc import ABC, abstractmethod
 
@@ -62,7 +65,17 @@ class LocalSentenceTransformerEmbeddingProvider(BaseEmbeddingProvider):
         except ImportError as exc:
             raise ImportError("sentence-transformers is required for local embeddings. Install with: pip install -e '.[local]'") from exc
         self.model_name=model_name or os.getenv("LOCAL_EMBEDDING_MODEL") or os.getenv("EMBEDDING_MODEL") or "BAAI/bge-small-en-v1.5"
-        self.normalize=normalize; self.model=SentenceTransformer(self.model_name)
+        self.normalize = normalize
+        device = os.getenv("EMBEDDING_DEVICE")
+        if not device:
+            try:
+                import torch
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+            except Exception:
+                device = "cpu"
+        self.device = device
+        self.model = SentenceTransformer(self.model_name, device=device)
+        print(f"[embedding] loaded {self.model_name} on {device}", file=sys.stderr)
     def embed_query(self,text:str)->list[float]: return self.embed_documents([text])[0]
     def embed_documents(self,texts:list[str])->list[list[float]]:
         encoded=self.model.encode(texts, normalize_embeddings=self.normalize)

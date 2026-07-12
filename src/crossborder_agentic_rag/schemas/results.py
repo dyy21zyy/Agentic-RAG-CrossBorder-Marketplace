@@ -27,6 +27,9 @@ class AgentState:
     reranker_provider: str | None = None
     retrieval_mode: str | None = None
     candidate_k: int | None = None
+    dense_k: int | None = None
+    bm25_k: int | None = None
+    rrf_k: int | None = None
     evidence_gaps: list[str] = field(default_factory=list)
     iterations: int = 0
     answer: str = ""

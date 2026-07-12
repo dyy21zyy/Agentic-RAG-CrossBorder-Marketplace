@@ -107,8 +107,34 @@ def _duckdb_lookup(duckdb_store: Any, query: str) -> dict[str, Any]:
     return lookups
 
 
-def build_ip_tools(retriever: Any, embedding_provider: Any = None, duckdb_store: Any = None, graph_retriever: Any = None, default_top_k: int = 8, candidate_k: int = 50) -> list[Any]:
+def build_ip_tools(
+    retriever: Any,
+    embedding_provider: Any = None,
+    duckdb_store: Any = None,
+    graph_retriever: Any = None,
+    default_top_k: int = 8,
+    candidate_k: int = 50,
+    dense_k: int | None = None,
+    bm25_k: int | None = None,
+    rrf_k: int | None = None,
+    **kwargs: Any,
+) -> list[Any]:
     """Build LangChain tool objects without relying on module-level state."""
+
+    # Formal retrieval K settings:
+    # Dense Top20, BM25 Top20, RRF Top10, Reranker Top5.
+    if retriever is not None:
+        for _name, _value in [
+            ("dense_k", dense_k if dense_k is not None else candidate_k),
+            ("bm25_k", bm25_k if bm25_k is not None else candidate_k),
+            ("rrf_k_final", rrf_k if rrf_k is not None else 10),
+            ("candidate_k", candidate_k),
+            ("top_k", default_top_k),
+        ]:
+            try:
+                setattr(retriever, _name, _value)
+            except Exception:
+                pass
     try:
         from langchain_core.tools import Tool
     except ImportError:

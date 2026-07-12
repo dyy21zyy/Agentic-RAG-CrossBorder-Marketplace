@@ -1,86 +1,63 @@
+# secrets
 .env
-.env.*
-!.env.example
-.venv/
-venv/
-**pycache**/
+*.key
+*.pem
+*.token
+
+# python cache
 __pycache__/
+*.pyc
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.ipynb_checkpoints/
 *.egg-info/
-.coverage
-htmlcov/
 
-data/
+# environments
+.venv/
+venv/
+env/
+conda-meta/
+
+# local models / checkpoints
+models/
+checkpoints/
+*.pt
+*.pth
+*.bin
+*.safetensors
+
+# raw / processed large data
+raw_ip/
 data/raw/
 data/processed/
-data/eval/
-data/**/*.jsonl
-data/**/*.db
-data/**/*.db-shm
-data/**/*.db-wal
-data/outputs/
+data/processed/*.duckdb
+data/processed/*.db
+data/processed/milvus_lite/
+data/processed/graph_index_full/
 
-*.duckdb
-*.db
-*.sqlite
-*.zip
-*.tar.gz
-*.pt
-*.pth
-*.bin
-*.safetensors
-autodl_pack/
-.tmp/
+# outputs / experiment results
+reports/
+runs/
+outputs/
+logs/
+*.log
 
-.DS_Store
-.vscode/
-.idea/
-logs/
-reports/
-*.bak
-*.diff
-__pycache__/
-.ipynb_checkpoints/
-.env
-data/
-*.duckdb
-*.db
-*.index
-*.pth
-*.pt
-*.bin
-*.safetensors
-logs/
-reports/
-data/
-*.jsonl.bak
-*.bak
-*.diff
-*.duckdb
-*.db
-*.index
-*.pth
-*.pt
-*.bin
-*.safetensors
-__pycache__/
-.ipynb_checkpoints/
-.env
-reports/
-logs/
-data/
+# backup files
 *.bak
 *.bak_*
 *.diff
-*.duckdb
-*.db
-*.index
-*.pth
-*.pt
-*.bin
-*.safetensors
-__pycache__/
-.ipynb_checkpoints/
-.env
+
+# temporary trace artifacts
+build_llm_query_plan
+run_initial_tool_plan
+tool_retrieval
+tool_duckdb_lookup
+tool_graph_retrieval
+evaluate_evidence
+final_rerank
+final_answer
+
+# system
+.DS_Store
+Thumbs.db

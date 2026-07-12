@@ -7,11 +7,27 @@ from crossborder_agentic_rag.graph.entity_extractor import extract_edges_from_ch
 
 LOGGER = logging.getLogger(__name__)
 
-def _merge_unique(old: list[str], new: list[str]) -> list[str]:
-    seen = set(); out = []
-    for v in [*old, *new]:
+def _merge_unique(base, extra):
+    """
+    Fast unique merge for full GraphRAG build.
+
+    The old version repeatedly rebuilt set(base) for high-frequency entities,
+    which becomes very slow on full chunk corpus. This version keeps behavior
+    unchanged but avoids unnecessary work for empty inputs.
+    """
+    if not extra:
+        return list(base or [])
+    if not base:
+        out = []
+        seen = set()
+    else:
+        out = list(base)
+        seen = set(out)
+
+    for v in extra:
         if v and v not in seen:
-            out.append(v); seen.add(v)
+            out.append(v)
+            seen.add(v)
     return out
 
 def _merge_metadata(old: dict, new: dict) -> dict:
