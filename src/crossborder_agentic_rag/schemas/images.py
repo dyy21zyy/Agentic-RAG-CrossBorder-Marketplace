@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from crossborder_agentic_rag.schemas._json import json_safe
+
 
 @dataclass(slots=True)
 class ImageAsset:
@@ -30,7 +32,7 @@ class ImageAsset:
             "storage_path": self.storage_path,
             "caption": self.caption,
             "ocr_text": self.ocr_text,
-            "metadata": dict(self.metadata),
+            "metadata": json_safe(self.metadata, "metadata"),
         }
 
     @classmethod

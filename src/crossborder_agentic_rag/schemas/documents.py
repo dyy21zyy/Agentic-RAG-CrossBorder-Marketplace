@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from crossborder_agentic_rag.constants import SOURCE_TYPES
+from crossborder_agentic_rag.schemas._json import json_safe
 from crossborder_agentic_rag.schemas.images import ImageAsset
 
 
@@ -42,7 +43,7 @@ class NormalizedDocument:
             "source_type": self.source_type,
             "title": self.title,
             "content": self.content,
-            "metadata": dict(self.metadata),
+            "metadata": json_safe(self.metadata, "metadata"),
             "images": [image.to_dict() for image in self.images],
         }
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from crossborder_agentic_rag.schemas._json import json_safe
+
 
 @dataclass(slots=True)
 class TraceEvent:
@@ -23,7 +25,7 @@ class TraceEvent:
             "trace_id": self.trace_id,
             "step": self.step,
             "event_type": self.event_type,
-            "payload": dict(self.payload),
+            "payload": json_safe(self.payload, "payload"),
             "timestamp": self.timestamp,
         }
 

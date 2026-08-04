@@ -1,3 +1,8 @@
+import json
+from datetime import datetime
+
+import pytest
+
 from crossborder_agentic_rag.schemas import (
     EvidenceChunk,
     EvidenceHit,
@@ -7,6 +12,25 @@ from crossborder_agentic_rag.schemas import (
     RiskVerdict,
     TraceEvent,
 )
+
+
+def _report_kwargs() -> dict:
+    return {
+        "report_id": "report-1",
+        "trace_id": "trace-1",
+        "created_at": "2026-08-03T00:00:00Z",
+        "product_profile": {"name": "smart phone case"},
+        "target_markets": ["US"],
+        "screening_scope": ["trademark"],
+        "overall_verdict": "caution",
+        "country_summaries": [],
+        "risk_cards": {},
+        "module_results": [],
+        "evidence_items": [],
+        "action_recommendations": [],
+        "missing_evidence": [],
+        "limitations": [],
+    }
 
 
 def test_text_document_defaults_to_empty_images():
@@ -62,3 +86,68 @@ def test_trace_event_has_json_serializable_payload():
         timestamp="2026-08-03T00:00:00Z",
     )
     assert event.to_dict()["payload"] == {"tool_count": 2}
+
+
+def test_nested_non_json_values_are_rejected_before_serialization():
+    trace = TraceEvent("trace-1", "planner", "llm_plan", {"nested": [{"bad": {1, 2}}]}, "2026-08-03T00:00:00Z")
+    with pytest.raises(TypeError, match="JSON-serializable"):
+        trace.to_dict()
+
+    image = ImageAsset("image-1", "doc-1", metadata={"nested": {"created": datetime(2026, 8, 3)}})
+    with pytest.raises(TypeError, match="JSON-serializable"):
+        image.to_dict()
+
+    hit = EvidenceHit(
+            evidence_id="E1",
+            chunk_id="trademark:1:chunk:0",
+            source_type="trademark",
+            title="Trademark evidence",
+            content="Registered mark evidence",
+            citation="[trademark:1:chunk:0] Trademark evidence",
+            rank=1,
+            score=1.0,
+            retrieval_mode="bm25_only",
+            tool_name="trademark_search_tool",
+            metadata={"nested": {"bad": object()}},
+        )
+    with pytest.raises(TypeError, match="JSON-serializable"):
+        hit.to_dict()
+
+    report_kwargs = _report_kwargs()
+    report_kwargs["product_profile"] = {"nested": {"bad": {"set"}}}
+    report = RiskScreeningReport(**report_kwargs)
+    with pytest.raises(TypeError, match="JSON-serializable"):
+        report.to_dict()
+
+    safe_event = TraceEvent("trace-1", "planner", "llm_plan", {"nested": [{"value": 1}]}, "2026-08-03T00:00:00Z")
+    json.dumps(safe_event.to_dict())
+
+
+def test_core_domains_verdicts_and_scopes_are_enforced():
+    with pytest.raises(ValueError, match="source_type"):
+        EvidenceHit(
+            evidence_id="E1",
+            chunk_id="unknown:1:chunk:0",
+            source_type="copyright",
+            title="Evidence",
+            content="Content",
+            citation="[unknown:1:chunk:0] Evidence",
+            rank=1,
+            score=1.0,
+            retrieval_mode="bm25_only",
+            tool_name="search_tool",
+        )
+
+    report_kwargs = _report_kwargs()
+    report = RiskScreeningReport(**report_kwargs)
+    assert report.overall_verdict is RiskVerdict.CAUTION
+
+    invalid_scope = _report_kwargs()
+    invalid_scope["screening_scope"] = ["trademark", "copyright"]
+    with pytest.raises(ValueError, match="screening_scope"):
+        RiskScreeningReport(**invalid_scope)
+
+    invalid_verdict = _report_kwargs()
+    invalid_verdict["overall_verdict"] = "infringement_found"
+    with pytest.raises(ValueError, match="overall_verdict"):
+        RiskScreeningReport(**invalid_verdict)

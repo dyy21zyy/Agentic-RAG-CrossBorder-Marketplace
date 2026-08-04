@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from crossborder_agentic_rag.constants import SOURCE_TYPES
+from crossborder_agentic_rag.schemas._json import json_safe
 from crossborder_agentic_rag.schemas.images import ImageAsset
 
 
@@ -59,7 +60,7 @@ class EvidenceChunk:
             "source_subtype": self.source_subtype,
             "title": self.title,
             "content": self.content,
-            "metadata": dict(self.metadata),
+            "metadata": json_safe(self.metadata, "metadata"),
             "score": self.score,
             "images": [image.to_dict() for image in self.images],
         }
@@ -87,6 +88,12 @@ class EvidenceHit:
     tool_name: str
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        if self.source_type not in SOURCE_TYPES:
+            raise ValueError(f"source_type must be one of {sorted(SOURCE_TYPES)}")
+        if not isinstance(self.metadata, dict):
+            raise TypeError("metadata must be a dict")
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "evidence_id": self.evidence_id,
@@ -99,7 +106,7 @@ class EvidenceHit:
             "score": self.score,
             "retrieval_mode": self.retrieval_mode,
             "tool_name": self.tool_name,
-            "metadata": dict(self.metadata),
+            "metadata": json_safe(self.metadata, "metadata"),
         }
 
     @classmethod
