@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import json
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -17,7 +18,22 @@ class ChatResult:
 
 
 class BaseChatClient(Protocol):
-    def complete(self, messages: list[dict[str, str]], temperature: float | None = None, max_tokens: int | None = None) -> ChatResult: ...
+    def complete(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> ChatResult:
+        pass
+
+    def complete_structured(
+        self,
+        messages: list[dict[str, str]],
+        schema_name: str,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> dict[str, Any]:
+        pass
 
 
 class TemplateChatClient:
@@ -42,9 +58,17 @@ class TemplateChatClient:
             model=self.model,
         )
 
+    def complete_structured(self, messages, schema_name, temperature=None, max_tokens=None):
+        return {
+            "schema_name": schema_name,
+            "provider": self.provider,
+            "model": self.model,
+            "content": self.complete(messages, temperature=temperature, max_tokens=max_tokens).content,
+        }
+
 
 class OpenAICompatibleChatClient:
-    def __init__(self, api_key: str | None, base_url: str | None, model: str | None, provider: str = "openai_compatible", timeout: float | None = 60.0, default_temperature: float = 0.0, default_max_tokens: int = 800) -> None:
+    def __init__(self, api_key: str | None, base_url: str | None, model: str | None, provider: str = "openai_compatible", timeout: float | None = 60.0, default_temperature: float = 0.0, default_max_tokens: int = 800, disable_thinking: bool = True) -> None:
         self.api_key = api_key
         self.base_url = base_url
         self.model = model
@@ -52,6 +76,7 @@ class OpenAICompatibleChatClient:
         self.timeout = timeout
         self.default_temperature = default_temperature
         self.default_max_tokens = default_max_tokens
+        self.disable_thinking = disable_thinking
 
     def complete(self, messages: list[dict[str, str]], temperature: float | None = None, max_tokens: int | None = None) -> ChatResult:
         if not self.api_key:
@@ -64,7 +89,21 @@ class OpenAICompatibleChatClient:
             if self.base_url:
                 kwargs["base_url"] = self.base_url
             client = OpenAI(**kwargs)
-            resp = client.chat.completions.create(model=self.model, messages=messages, temperature=self.default_temperature if temperature is None else temperature, max_tokens=self.default_max_tokens if max_tokens is None else max_tokens)
+            request = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": self.default_temperature if temperature is None else temperature,
+                "max_tokens": self.default_max_tokens if max_tokens is None else max_tokens,
+            }
+            disable_thinking_applied = False
+            if self.disable_thinking:
+                request["extra_body"] = {"enable_thinking": False}
+            try:
+                resp = client.chat.completions.create(**request)
+                disable_thinking_applied = self.disable_thinking
+            except TypeError:
+                request.pop("extra_body", None)
+                resp = client.chat.completions.create(**request)
             choices = getattr(resp, "choices", None)
             if choices is None:
                 return ChatResult("", self.provider, self.model, error="LLM response choices is None")
@@ -76,10 +115,38 @@ class OpenAICompatibleChatClient:
                 return ChatResult("", self.provider, self.model, error="LLM response content is empty")
             usage_obj = getattr(resp, "usage", None)
             usage = usage_obj.model_dump() if hasattr(usage_obj, "model_dump") else (dict(usage_obj) if isinstance(usage_obj, dict) else None)
-            raw = resp.model_dump() if hasattr(resp, "model_dump") else None
+            raw = {"choices": [{"message": {"content": str(content)}}]}
+            if self.disable_thinking and not disable_thinking_applied:
+                return ChatResult(
+                    "",
+                    self.provider,
+                    self.model,
+                    usage=usage,
+                    error="disable_thinking_not_applied",
+                    raw={
+                        "disable_thinking_requested": True,
+                        "disable_thinking_applied": False,
+                    },
+                )
             return ChatResult(str(content), self.provider, self.model, usage=usage, raw=raw)
         except Exception as exc:
             return ChatResult("", self.provider, self.model, error=str(exc))
+
+    def complete_structured(self, messages, schema_name, temperature=None, max_tokens=None):
+        result = self.complete(messages, temperature=temperature, max_tokens=max_tokens)
+        content = result.content.strip()
+        if content.startswith("```") and content.endswith("```"):
+            content = content[3:-3].strip()
+            if content.startswith("json"):
+                content = content[4:].strip()
+        try:
+            parsed = json.loads(content)
+            return parsed if isinstance(parsed, dict) else {"schema_name": schema_name, "content": parsed}
+        except (json.JSONDecodeError, TypeError):
+            return {
+                "schema_name": schema_name,
+                "error": "structured_output_parse_failed",
+            }
 
 
 def _first(*values: str | None) -> str | None:
@@ -89,7 +156,7 @@ def _first(*values: str | None) -> str | None:
     return None
 
 
-def build_chat_client(provider: str | None = None, api_key: str | None = None, base_url: str | None = None, model: str | None = None, timeout: float | None = 60.0, default_temperature: float = 0.0, default_max_tokens: int = 800) -> BaseChatClient:
+def build_chat_client(provider: str | None = None, api_key: str | None = None, base_url: str | None = None, model: str | None = None, timeout: float | None = 60.0, default_temperature: float = 0.0, default_max_tokens: int = 800, disable_thinking: bool = True) -> BaseChatClient:
     resolved_provider = (provider or os.getenv("LLM_PROVIDER") or "template").strip()
     name = resolved_provider.lower().replace("-", "_")
     resolved_key = _first(api_key, os.getenv("LLM_API_KEY"), os.getenv("OPENAI_API_KEY"))
@@ -98,5 +165,5 @@ def build_chat_client(provider: str | None = None, api_key: str | None = None, b
     if name in {"template", "none"}:
         return TemplateChatClient(provider=resolved_provider, model=resolved_model or "template")
     if name in {"openai_compatible", "openai"}:
-        return OpenAICompatibleChatClient(resolved_key, resolved_base, resolved_model, provider=resolved_provider, timeout=timeout, default_temperature=default_temperature, default_max_tokens=default_max_tokens)
+        return OpenAICompatibleChatClient(resolved_key, resolved_base, resolved_model, provider=resolved_provider, timeout=timeout, default_temperature=default_temperature, default_max_tokens=default_max_tokens, disable_thinking=disable_thinking)
     raise ValueError(f"Unsupported LLM provider: {resolved_provider}")

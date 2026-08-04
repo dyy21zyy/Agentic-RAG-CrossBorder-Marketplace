@@ -1,0 +1,18 @@
+llm:
+  provider: template
+  model: template
+  disable_thinking: true
+retrieval:
+  provider: local_bm25_jsonl
+  chunks_path: tests/fixtures/agent/sample_chunks.jsonl
+  default_mode: hybrid_rerank
+  top_k: 8
+  candidate_k: 50
+observability:
+  provider: local_jsonl
+mcp:
+  enabled: true
+dashboard:
+  enabled: true
+evaluation:
+  golden_set: eval/queries_small.jsonl

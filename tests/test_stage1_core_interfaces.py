@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import math
+import sys
 from pathlib import Path
 
 import pytest
@@ -190,7 +191,8 @@ def test_reranker_factory_reads_environment(monkeypatch: pytest.MonkeyPatch) -> 
     assert isinstance(build_reranker(), NoOpReranker)
 
 
-def test_reranker_factory_rejects_unknown_provider() -> None:
+def test_reranker_factory_reports_missing_cross_encoder_dependency(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "sentence_transformers", None)
     with pytest.raises(ImportError, match="sentence-transformers"):
         build_reranker("cross_encoder")
 
@@ -198,7 +200,18 @@ def test_reranker_factory_rejects_unknown_provider() -> None:
 def test_public_schema_exports() -> None:
     import crossborder_agentic_rag.schemas as schemas
 
-    assert schemas.__all__ == ["NormalizedDocument", "EvidenceChunk", "QueryPlan", "AgentState"]
+    assert schemas.__all__ == [
+        "EvaluationRun",
+        "NormalizedDocument",
+        "EvidenceChunk",
+        "EvidenceHit",
+        "ImageAsset",
+        "QueryPlan",
+        "RiskScreeningReport",
+        "RiskVerdict",
+        "AgentState",
+        "TraceEvent",
+    ]
 
 
 def test_public_embedding_exports() -> None:

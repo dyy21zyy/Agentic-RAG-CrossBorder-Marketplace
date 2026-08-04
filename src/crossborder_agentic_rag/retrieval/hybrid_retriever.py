@@ -105,17 +105,18 @@ class HybridRetriever:
 
         if mode == "dense_only":
             return self._dense(query, dense_vector, filters, dense_k, source_types)[:top_k]
+        bm25_hits = None
         if mode in {"hybrid_rrf", "hybrid_rerank"}:
-            exact_hits = self._maybe_exact_bm25_fast_path(query, filters, bm25_k, source_types)
-            if exact_hits is not None:
+            bm25_hits = self._bm25(query, filters, bm25_k, source_types)
+            if self._is_exact_bm25_hits(bm25_hits):
                 if mode == "hybrid_rerank" and getattr(self, "reranker", None) is not None:
-                    return self.reranker.rerank(query, exact_hits, top_k)
-                return exact_hits[:top_k]
+                    return self.reranker.rerank(query, bm25_hits, top_k)
+                return bm25_hits[:top_k]
 
 
 
         if mode == "hybrid_rrf":
-            bm25_hits = self._bm25(query, filters, bm25_k, source_types)
+            bm25_hits = bm25_hits if bm25_hits is not None else self._bm25(query, filters, bm25_k, source_types)
             dense_hits = self._dense(query, dense_vector, filters, dense_k, source_types)
 
             fused = rrf_fusion(
@@ -129,7 +130,7 @@ class HybridRetriever:
             if self.reranker is None:
                 raise ValueError("Reranker is required for hybrid_rerank retrieval")
 
-            bm25_hits = self._bm25(query, filters, bm25_k, source_types)
+            bm25_hits = bm25_hits if bm25_hits is not None else self._bm25(query, filters, bm25_k, source_types)
             dense_hits = self._dense(query, dense_vector, filters, dense_k, source_types)
 
             fused = rrf_fusion(

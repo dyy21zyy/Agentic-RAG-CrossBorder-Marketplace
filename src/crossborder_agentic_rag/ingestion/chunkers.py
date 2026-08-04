@@ -134,6 +134,7 @@ def make_chunk(
         content=normalize_whitespace(content),
         metadata=metadata,
         score=0.0,
+        images=list(doc.images),
     )
 
 

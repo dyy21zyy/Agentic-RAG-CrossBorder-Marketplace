@@ -80,6 +80,10 @@ class MilvusChunkStore:
         return " and ".join(parts)
     def ensure_collection(self)->None:
         pm=_load_pymilvus()
+        if self.is_lite and not hasattr(pm, "FieldSchema"):
+            if self.client is None:
+                self.connect()
+            return
         fields=[pm.FieldSchema(name="chunk_id",dtype=pm.DataType.VARCHAR,is_primary=True,max_length=256),pm.FieldSchema(name="doc_id",dtype=pm.DataType.VARCHAR,max_length=256),pm.FieldSchema(name="source_type",dtype=pm.DataType.VARCHAR,max_length=64),pm.FieldSchema(name="source_subtype",dtype=pm.DataType.VARCHAR,max_length=128),pm.FieldSchema(name="title",dtype=pm.DataType.VARCHAR,max_length=1024),pm.FieldSchema(name="content",dtype=pm.DataType.VARCHAR,max_length=65535),pm.FieldSchema(name="parent_id",dtype=pm.DataType.VARCHAR,max_length=256),pm.FieldSchema(name="context_path",dtype=pm.DataType.VARCHAR,max_length=2048),pm.FieldSchema(name="partition",dtype=pm.DataType.VARCHAR,max_length=64),pm.FieldSchema(name="dense_vector",dtype=pm.DataType.FLOAT_VECTOR,dim=self.embedding_dim),pm.FieldSchema(name="metadata_json",dtype=pm.DataType.VARCHAR,max_length=65535)]
         fields += [pm.FieldSchema(name=f,dtype=pm.DataType.VARCHAR,max_length=512) for f in META_FIELDS]
         schema=pm.CollectionSchema(fields=fields,description="IP evidence chunks")

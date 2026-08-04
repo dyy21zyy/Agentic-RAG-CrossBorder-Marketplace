@@ -1,0 +1,18 @@
+llm:
+  providers:
+    - template
+    - openai_compatible
+embedding:
+  providers:
+    - fake
+    - local
+    - openai_compatible
+reranker:
+  providers:
+    - noop
+    - lexical
+    - local
+trace:
+  providers:
+    - local_jsonl
+    - langfuse
