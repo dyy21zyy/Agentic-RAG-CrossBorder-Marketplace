@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
@@ -12,6 +13,7 @@ from crossborder_agentic_rag.schemas import (
     RiskVerdict,
     TraceEvent,
 )
+from crossborder_agentic_rag.ingestion.io_utils import read_chunks_jsonl
 
 
 def _report_kwargs() -> dict:
@@ -42,6 +44,25 @@ def test_text_document_defaults_to_empty_images():
     )
     assert doc.images == []
     assert doc.to_dict()["images"] == []
+
+
+def test_document_from_legacy_json_without_images():
+    doc = NormalizedDocument.from_dict(
+        {
+            "doc_id": "patent:1",
+            "source_type": "patent",
+            "title": "Patent 1",
+            "content": "Claim evidence",
+            "metadata": {},
+        }
+    )
+    assert doc.images == []
+
+
+def test_read_fixture_chunks_have_images_field():
+    chunks = read_chunks_jsonl(Path("tests/fixtures/agent/sample_chunks.jsonl"))
+    assert chunks
+    assert all(chunk.images == [] for chunk in chunks)
 
 
 def test_risk_report_required_fields_round_trip():

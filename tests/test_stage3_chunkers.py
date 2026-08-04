@@ -12,6 +12,7 @@ from crossborder_agentic_rag.ingestion.chunkers import MAX_LITIGATION_DOCKET_CHU
 from crossborder_agentic_rag.ingestion.io_utils import read_chunks_jsonl, read_documents_jsonl, write_chunks_jsonl
 from crossborder_agentic_rag.schemas.documents import NormalizedDocument
 from crossborder_agentic_rag.schemas.evidence import EvidenceChunk
+from crossborder_agentic_rag.schemas.images import ImageAsset
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests" / "fixtures" / "chunks" / "sample_normalized_docs.jsonl"
@@ -41,6 +42,23 @@ def test_chunk_document_dispatches_by_source_type():
     for doc in docs():
         assert_valid_chunks(chunk_document(doc), doc)
     assert len(chunk_documents(docs())) >= 10
+
+
+def test_chunker_preserves_document_images():
+    image = ImageAsset("image-1", "trademark:1", storage_path="images/image-1.png")
+    doc = NormalizedDocument(
+        "trademark:1",
+        "trademark",
+        "MARK",
+        "Mark evidence",
+        {"word_mark": "MARK"},
+        [image],
+    )
+
+    chunks = chunk_document(doc)
+
+    assert chunks
+    assert all(chunk.images == [image] for chunk in chunks)
 
 
 def test_chunk_document_rejects_unknown_source_type():
