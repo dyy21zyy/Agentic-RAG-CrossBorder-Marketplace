@@ -315,6 +315,10 @@ Real Milvus mode requires a running Milvus instance, pymilvus installed, and rea
 Only risk_analysis answers include Risk Level. Other answer types should be read as evidence-focused responses rather than overall risk classifications.
 
 ```bash
+python scripts/query.py "Can I sell this phone case in the US?" --target-market US --scope trademark --output-json
+```
+
+```bash
 python scripts/08_run_query_cli.py \
   "Which Nice classes are associated with the queried trademark evidence?" \
   --duckdb-path data/processed/ip.duckdb \
