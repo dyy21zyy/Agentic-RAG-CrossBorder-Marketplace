@@ -1,5 +1,7 @@
 # secrets
 .env
+.env.*
+!.env.example
 *.key
 *.pem
 *.token
@@ -8,6 +10,7 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+.pytest_tmp/
 .mypy_cache/
 .ruff_cache/
 .ipynb_checkpoints/
@@ -31,6 +34,10 @@ checkpoints/
 raw_ip/
 data/raw/
 data/processed/
+data/eval/
+*.duckdb
+*.db
+*.sqlite
 data/processed/*.duckdb
 data/processed/*.db
 data/processed/milvus_lite/

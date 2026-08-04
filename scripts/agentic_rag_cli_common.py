@@ -138,7 +138,7 @@ def _milvus_uri() -> str | None:
 
 
 def _is_agentic_mode(mode: str) -> bool:
-    return mode in {"rule_based", "agentic_llm"}
+    return mode in {"agentic", "rule_based", "agentic_llm"}
 
 
 class RAGRuntime:
@@ -162,7 +162,7 @@ class RAGRuntime:
         start = time.perf_counter()
         args = self.args
 
-        if args.pipeline_mode in {"rule_based", "agentic_llm"}:
+        if args.pipeline_mode in {"agentic", "rule_based", "agentic_llm"}:
             state = self.agent.run(query)
             final_evidence = state.reranked_evidence or state.retrieved_evidence
 
@@ -396,7 +396,7 @@ def build_runtime(args: Namespace) -> RAGRuntime:
 
     agent = None
 
-    if args.pipeline_mode == "rule_based":
+    if args.pipeline_mode in {"agentic", "rule_based"}:
         agent = AgenticRAG(
             duck,
             retriever,

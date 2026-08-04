@@ -19,6 +19,7 @@ llm = [
 ]
 dev = [
     "pytest>=8.0",
+    "ruff>=0.6",
 ]
 local = [
     "sentence-transformers>=2.0",
@@ -40,8 +41,17 @@ html = [
 ]
 
 [tool.pytest.ini_options]
+addopts = "--basetemp=.pytest_tmp"
 pythonpath = ["src"]
 testpaths = ["tests"]
 markers = [
     "integration: tests requiring external services such as Milvus"
+]
+
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.1",
 ]
