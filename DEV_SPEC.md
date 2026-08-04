@@ -943,17 +943,14 @@ v1 是本地优先系统，不要求生产级并发，但需要建立基准：
 
 默认 CI：
 
-```text
+```bash
 python -m compileall -q src scripts
+pytest -q tests/test_v1_schema_contracts.py tests/test_v1_config_registry.py tests/test_v1_llm_client.py tests/test_v1_report_builder.py tests/test_v1_agentic_runtime.py tests/test_v1_trace_adapters.py tests/test_v1_mcp_tools.py tests/test_v1_dashboard_services.py tests/test_v1_evaluation_runner.py tests/test_v1_cli_contracts.py
+pytest -q tests/test_stage1_core_interfaces.py tests/test_stage2_parsers.py tests/test_stage3_chunkers.py tests/test_stage6_agent_workflow.py tests/test_stage8_end_to_end.py
 pytest -q
-schema contract tests
-fixture E2E tests
-MCP schema tests
-report builder tests
-citation audit tests
-runtime artifact path contract tests
-schema and artifact path contract tests
 ```
+
+CI does not launch optional Milvus, Langfuse, Streamlit, or MCP server integrations; those remain manual or nightly checks.
 
 可选手动/夜间评测：
 

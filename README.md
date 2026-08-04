@@ -1,6 +1,6 @@
-# Agentic RAG for Cross-Border E-Commerce IP QA
+# 基于 Agentic RAG 的跨境电商知识产权风险初筛系统
 
-This project builds a single-agent LangChain RAG + GraphRAG system for cross-border e-commerce intellectual property question answering. It focuses on trademark records, patent claims, and patent litigation evidence. The system combines Milvus dense retrieval, BM25 sparse retrieval, DuckDB exact lookup, lightweight NetworkX-based GraphRAG, RRF fusion, reranking, and grounded answer generation.
+This project builds a single-turn, tool-planning Agentic RAG system for preliminary cross-border e-commerce IP risk screening.
 
 This system is not legal advice.
 
@@ -316,6 +316,15 @@ Only risk_analysis answers include Risk Level. Other answer types should be read
 
 ```bash
 python scripts/query.py "Can I sell this phone case in the US?" --target-market US --scope trademark --output-json
+```
+
+### Stable workflows
+
+```bash
+python scripts/query.py "Can I sell this phone case in the US?" --target-market US --output-json
+python scripts/evaluate.py --eval-file eval/queries_small.jsonl --output-dir reports/eval/demo
+python scripts/run_mcp_server.py --help
+python scripts/run_dashboard.py --help
 ```
 
 ```bash
