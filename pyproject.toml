@@ -39,6 +39,9 @@ pdf = [
 html = [
     "beautifulsoup4>=4.12",
 ]
+mcp = [
+    "mcp>=1.0",
+]
 
 [tool.pytest.ini_options]
 addopts = "--basetemp=.pytest_tmp"
