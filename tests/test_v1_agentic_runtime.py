@@ -106,3 +106,36 @@ def test_plan_tools_falls_back_for_malformed_llm_output():
             "required_evidence": "litigation",
         }
     ]
+
+
+from crossborder_agentic_rag.agentic.runtime import RiskScreeningRuntime
+from crossborder_agentic_rag.schemas import EvidenceHit, RiskVerdict
+
+
+class FakeDispatcher:
+    def run(self, action):
+        return [
+            EvidenceHit(
+                evidence_id="E1",
+                chunk_id="trademark:1:chunk:0",
+                source_type="trademark",
+                title="Trademark evidence",
+                content="Registered mark evidence",
+                citation="[trademark:1:chunk:0] Trademark evidence",
+                rank=1,
+                score=1.0,
+                retrieval_mode=action["retrieval_mode"],
+                tool_name=action["tool"],
+            )
+        ]
+
+
+def test_runtime_returns_structured_report():
+    runtime = RiskScreeningRuntime(dispatcher=FakeDispatcher(), llm=None)
+    report = runtime.run(
+        query="Can I sell a smart phone case?",
+        target_markets=["US"],
+        scope=["trademark"],
+    )
+    assert report.overall_verdict == RiskVerdict.CAUTION
+    assert report.evidence_items[0].tool_name == "trademark_search_tool"
