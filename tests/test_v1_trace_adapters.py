@@ -40,6 +40,19 @@ def test_disabled_langfuse_sink_uses_fallback():
     assert fallback.events == [event]
 
 
+def test_langfuse_failure_preserves_event_and_records_backend_error():
+    fallback = _RecordingSink()
+    event = TraceEvent("trace-1", "planner", "tool_plan", {"tool_count": 1}, "now")
+    sink = LangfuseTraceSink(enabled=True, fallback=fallback)
+    sink._record_langfuse = lambda event: (_ for _ in ()).throw(RuntimeError("langfuse unavailable"))
+
+    sink.record(event)
+
+    assert fallback.events[0] == event
+    assert fallback.events[1].event_type == "trace_backend_error"
+    assert fallback.events[1].payload["original_event_type"] == "tool_plan"
+
+
 def test_runtime_records_structural_events_without_reasoning_content():
     class Dispatcher:
         def run(self, action):

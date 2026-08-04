@@ -22,6 +22,7 @@ class LangfuseTraceSink:
         try:
             self._record_langfuse(event)
         except Exception as exc:
+            self.fallback.record(event)
             self.fallback.record(
                 TraceEvent(
                     trace_id=event.trace_id,
