@@ -203,6 +203,47 @@ def test_create_mcp_server_default_query_trace_is_readable(tmp_path: Path, monke
     ]
 
 
+def test_create_mcp_server_jsonl_trace_resource_filters_each_query(tmp_path: Path, monkeypatch):
+    registered = {"tools": {}, "resources": {}}
+
+    class FakeFastMCP:
+        def __init__(self, name):
+            self.name = name
+
+        def tool(self, name=None):
+            def decorator(func):
+                registered["tools"][name or func.__name__] = func
+                return func
+
+            return decorator
+
+        def resource(self, uri):
+            def decorator(func):
+                registered["resources"][uri] = func
+                return func
+
+            return decorator
+
+    fake_mcp = types.SimpleNamespace(server=types.SimpleNamespace(fastmcp=types.SimpleNamespace(FastMCP=FakeFastMCP)))
+    monkeypatch.setitem(sys.modules, "mcp", fake_mcp)
+    monkeypatch.setitem(sys.modules, "mcp.server", fake_mcp.server)
+    monkeypatch.setitem(sys.modules, "mcp.server.fastmcp", fake_mcp.server.fastmcp)
+
+    trace_log = tmp_path / "local.jsonl"
+    mcp_server.create_mcp_server(trace_dir=trace_log)
+    first = registered["tools"]["query_ip_risk"]({"query": "first phone case", "scope": ["trademark"]})
+    second = registered["tools"]["query_ip_risk"]({"query": "second phone case", "scope": ["trademark"]})
+    first_trace_id = first["structuredContent"]["trace_id"]
+    second_trace_id = second["structuredContent"]["trace_id"]
+
+    first_trace = registered["resources"]["trace://{trace_id}"](first_trace_id)
+    second_trace = registered["resources"]["trace://{trace_id}"](second_trace_id)
+
+    assert first_trace_id != second_trace_id
+    assert {event["trace_id"] for event in first_trace["events"]} == {first_trace_id}
+    assert {event["trace_id"] for event in second_trace["events"]} == {second_trace_id}
+
+
 @pytest.mark.parametrize("tool", [query_ip_risk_tool, search_evidence_tool])
 def test_mcp_tools_reject_invalid_query(tool):
     dependency = FakeRuntime() if tool is query_ip_risk_tool else FakeDispatcher([])
