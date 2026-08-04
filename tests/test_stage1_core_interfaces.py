@@ -200,7 +200,18 @@ def test_reranker_factory_reports_missing_cross_encoder_dependency(monkeypatch: 
 def test_public_schema_exports() -> None:
     import crossborder_agentic_rag.schemas as schemas
 
-    assert schemas.__all__ == ["NormalizedDocument", "EvidenceChunk", "QueryPlan", "AgentState"]
+    assert schemas.__all__ == [
+        "EvaluationRun",
+        "NormalizedDocument",
+        "EvidenceChunk",
+        "EvidenceHit",
+        "ImageAsset",
+        "QueryPlan",
+        "RiskScreeningReport",
+        "RiskVerdict",
+        "AgentState",
+        "TraceEvent",
+    ]
 
 
 def test_public_embedding_exports() -> None:

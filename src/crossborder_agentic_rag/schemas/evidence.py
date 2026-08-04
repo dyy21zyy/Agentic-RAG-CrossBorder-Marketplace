@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from crossborder_agentic_rag.constants import SOURCE_TYPES
+from crossborder_agentic_rag.schemas.images import ImageAsset
 
 
 @dataclass(slots=True)
@@ -20,6 +21,7 @@ class EvidenceChunk:
     content: str
     metadata: dict[str, Any] = field(default_factory=dict)
     score: float = 0.0
+    images: list[ImageAsset] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not isinstance(self.chunk_id, str):
@@ -42,6 +44,8 @@ class EvidenceChunk:
             raise TypeError("content must be a string")
         if not isinstance(self.metadata, dict):
             raise TypeError("metadata must be a dict")
+        if not isinstance(self.images, list):
+            raise TypeError("images must be a list")
         try:
             self.score = float(self.score)
         except (TypeError, ValueError) as exc:
@@ -57,10 +61,49 @@ class EvidenceChunk:
             "content": self.content,
             "metadata": dict(self.metadata),
             "score": self.score,
+            "images": [image.to_dict() for image in self.images],
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "EvidenceChunk":
+        if not isinstance(data, dict):
+            raise TypeError("data must be a dict")
+        values = dict(data)
+        values["images"] = [ImageAsset.from_dict(image) for image in values.get("images", [])]
+        return cls(**values)
+
+
+@dataclass(slots=True)
+class EvidenceHit:
+    evidence_id: str
+    chunk_id: str
+    source_type: str
+    title: str
+    content: str
+    citation: str
+    rank: int
+    score: float
+    retrieval_mode: str
+    tool_name: str
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "evidence_id": self.evidence_id,
+            "chunk_id": self.chunk_id,
+            "source_type": self.source_type,
+            "title": self.title,
+            "content": self.content,
+            "citation": self.citation,
+            "rank": self.rank,
+            "score": self.score,
+            "retrieval_mode": self.retrieval_mode,
+            "tool_name": self.tool_name,
+            "metadata": dict(self.metadata),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "EvidenceHit":
         if not isinstance(data, dict):
             raise TypeError("data must be a dict")
         return cls(**data)
