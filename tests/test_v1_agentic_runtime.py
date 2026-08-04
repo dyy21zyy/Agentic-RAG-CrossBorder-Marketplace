@@ -109,7 +109,8 @@ def test_plan_tools_falls_back_for_malformed_llm_output():
 
 
 from crossborder_agentic_rag.agentic.runtime import RiskScreeningRuntime
-from crossborder_agentic_rag.schemas import EvidenceHit, RiskVerdict
+from crossborder_agentic_rag.agentic.dispatcher import ToolDispatcher
+from crossborder_agentic_rag.schemas import EvidenceChunk, EvidenceHit, RiskVerdict
 
 
 class FakeDispatcher:
@@ -139,3 +140,63 @@ def test_runtime_returns_structured_report():
     )
     assert report.overall_verdict == RiskVerdict.CAUTION
     assert report.evidence_items[0].tool_name == "trademark_search_tool"
+
+
+def test_dispatcher_without_backends_returns_empty_hits():
+    dispatcher = ToolDispatcher()
+
+    assert dispatcher.run({"tool": "trademark_search_tool"}) == []
+
+
+class SourceBalancedRetrieverLike:
+    def retrieve(self, query, source_types=None):
+        return [
+            EvidenceChunk(
+                chunk_id="trademark:1:chunk:0",
+                doc_id="trademark:1",
+                source_type="trademark",
+                source_subtype="registration",
+                title="Trademark evidence",
+                content=query,
+                score=0.75,
+            )
+        ]
+
+
+def test_dispatcher_adapts_retriever_without_mode_parameter():
+    dispatcher = ToolDispatcher(retriever=SourceBalancedRetrieverLike())
+
+    hits = dispatcher.run(
+        {
+            "tool": "trademark_search_tool",
+            "query": "smart phone case",
+            "retrieval_mode": "hybrid_rerank",
+            "required_evidence": "trademark",
+        }
+    )
+
+    assert len(hits) == 1
+    assert hits[0].retrieval_mode == "hybrid_rerank"
+    assert hits[0].source_type == "trademark"
+
+
+def test_dispatcher_assigns_unique_evidence_ids_across_actions():
+    dispatcher = ToolDispatcher(retriever=SourceBalancedRetrieverLike())
+    actions = [
+        {
+            "tool": "trademark_search_tool",
+            "query": "smart phone case",
+            "retrieval_mode": "hybrid_rerank",
+            "required_evidence": "trademark",
+        },
+        {
+            "tool": "patent_search_tool",
+            "query": "smart phone case",
+            "retrieval_mode": "hybrid_rerank",
+            "required_evidence": "patent",
+        },
+    ]
+
+    hits = [hit for action in actions for hit in dispatcher.run(action)]
+
+    assert len({hit.evidence_id for hit in hits}) == len(hits)

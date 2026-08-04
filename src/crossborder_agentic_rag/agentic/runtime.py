@@ -6,6 +6,7 @@ from crossborder_agentic_rag.agentic.evidence_gap import find_missing_evidence
 from crossborder_agentic_rag.agentic.normalizer import normalize_user_query
 from crossborder_agentic_rag.agentic.planner import plan_tools
 from crossborder_agentic_rag.reports.builder import build_risk_screening_report
+from crossborder_agentic_rag.schemas import RiskScreeningReport
 
 
 class RiskScreeningRuntime:
@@ -18,7 +19,7 @@ class RiskScreeningRuntime:
         query: str,
         target_markets: list[str] | None = None,
         scope: list[str] | None = None,
-    ):
+    ) -> RiskScreeningReport:
         selected_scope = scope or ["trademark", "patent", "litigation"]
         normalized = normalize_user_query(query, target_markets)
         actions = plan_tools(str(normalized["query"]), selected_scope, llm=self.llm)

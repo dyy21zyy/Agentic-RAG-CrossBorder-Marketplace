@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 from crossborder_agentic_rag.schemas import EvidenceHit
@@ -25,6 +26,7 @@ class ToolDispatcher:
         self.retriever = retriever
         self.duckdb_store = duckdb_store
         self.graph_retriever = graph_retriever
+        self._evidence_count = 0
 
     def run(self, action: dict[str, Any]) -> list[EvidenceHit]:
         if self.retriever is None:
@@ -32,22 +34,31 @@ class ToolDispatcher:
 
         tool = str(action.get("tool", ""))
         source_type = action.get("required_evidence") or TOOL_SOURCE_TYPES.get(tool)
-        chunks = self.retriever.retrieve(
-            str(action.get("query", "")),
-            mode=action.get("retrieval_mode", "hybrid_rerank"),
-            source_types=[source_type] if source_type else None,
-        )
+        query = str(action.get("query", ""))
+        retrieval_kwargs = {"source_types": [source_type] if source_type else None}
+        try:
+            parameters = inspect.signature(self.retriever.retrieve).parameters
+        except (TypeError, ValueError):
+            parameters = {}
+        if "mode" in parameters or any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
+        ):
+            retrieval_kwargs["mode"] = action.get("retrieval_mode", "hybrid_rerank")
+        chunks = self.retriever.retrieve(query, **retrieval_kwargs)
         return [
             self._to_evidence_hit(chunk, rank=index, action=action, source_type=source_type)
             for index, chunk in enumerate(chunks, start=1)
         ]
 
-    @staticmethod
-    def _to_evidence_hit(chunk, rank: int, action: dict[str, Any], source_type: str | None) -> EvidenceHit:
+    def _next_evidence_id(self) -> int:
+        self._evidence_count += 1
+        return self._evidence_count
+
+    def _to_evidence_hit(self, chunk, rank: int, action: dict[str, Any], source_type: str | None) -> EvidenceHit:
         chunk_id = str(_get(chunk, "chunk_id", f"chunk:{rank}"))
         title = str(_get(chunk, "title", ""))
         return EvidenceHit(
-            evidence_id=f"E{rank}",
+            evidence_id=f"E{self._next_evidence_id()}",
             chunk_id=chunk_id,
             source_type=str(_get(chunk, "source_type", source_type or "")),
             title=title,
