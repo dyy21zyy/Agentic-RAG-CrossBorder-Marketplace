@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from crossborder_agentic_rag.evaluation.agent_metrics import agent_metrics
-from crossborder_agentic_rag.evaluation.citation_metrics import citation_metrics
 from crossborder_agentic_rag.evaluation.eval_runner import run_fixture_evaluation
 from crossborder_agentic_rag.schemas import RiskScreeningReport, RiskVerdict
 
@@ -29,7 +29,10 @@ class FixtureRuntime:
             screening_scope=scope or ["trademark"],
             overall_verdict=RiskVerdict.INSUFFICIENT_EVIDENCE,
             country_summaries=[],
-            risk_cards={verdict.value: 0 for verdict in RiskVerdict},
+            risk_cards={
+                verdict.value: int(verdict is RiskVerdict.INSUFFICIENT_EVIDENCE)
+                for verdict in RiskVerdict
+            },
             module_results=[],
             evidence_items=[],
             action_recommendations=[],
@@ -50,6 +53,21 @@ def _load_jsonl(path: Path) -> list[dict]:
     return rows
 
 
+def _build_runtime():
+    """Build the configured runtime, falling back to the fixture runtime."""
+    factory_ref = os.getenv("CROSSBORDER_EVAL_RUNTIME_FACTORY")
+    if not factory_ref:
+        return FixtureRuntime()
+    try:
+        module_name, factory_name = factory_ref.rsplit(":", 1)
+    except ValueError as exc:
+        raise ValueError(
+            "CROSSBORDER_EVAL_RUNTIME_FACTORY must be formatted as module:callable"
+        ) from exc
+    factory = getattr(importlib.import_module(module_name), factory_name)
+    return factory()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--eval-file", type=Path, required=True)
@@ -58,7 +76,7 @@ def main() -> int:
 
     rows = _load_jsonl(args.eval_file)
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    run = run_fixture_evaluation(rows, FixtureRuntime())
+    run = run_fixture_evaluation(rows, _build_runtime())
     run.artifact_paths.update(
         {
             "summary": "summary.json",
