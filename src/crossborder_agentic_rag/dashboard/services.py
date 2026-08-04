@@ -24,4 +24,7 @@ def summarize_report(report: RiskScreeningReport) -> dict[str, Any]:
 def load_eval_summary(path: str | Path) -> dict[str, Any]:
     """Load a JSON evaluation summary from disk."""
     with Path(path).open(encoding="utf-8") as file:
-        return json.load(file)
+        summary = json.load(file)
+    if not isinstance(summary, dict):
+        raise ValueError("evaluation summary JSON root must be a JSON object")
+    return summary
