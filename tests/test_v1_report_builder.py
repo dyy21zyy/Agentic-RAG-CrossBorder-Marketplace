@@ -72,3 +72,38 @@ def test_citation_audit_rejects_missing_evidence_reference():
     assert result["valid_citation_rate"] == 0.0
     assert result["citation_coverage"] == 0.0
     assert result["unsupported_claim_count"] == 1
+
+
+def test_citation_audit_rejects_corrupt_evidence_hit_citation():
+    report = build_risk_screening_report(
+        query="q",
+        target_markets=["US"],
+        scope=["trademark"],
+        evidence_hits=[make_hit()],
+        missing_evidence=[],
+        trace_id="trace-1",
+    )
+    report.evidence_items[0].citation = "[other-chunk] Wrong source"
+
+    result = audit_report_citations(report)
+
+    assert result["valid_citation_rate"] < 1.0
+    assert result["unsupported_claim_count"] == 2
+
+
+def test_citation_audit_rejects_country_summary_claim_without_evidence_refs():
+    report = build_risk_screening_report(
+        query="q",
+        target_markets=["US"],
+        scope=["trademark"],
+        evidence_hits=[make_hit()],
+        missing_evidence=[],
+        trace_id="trace-1",
+    )
+    report.country_summaries = [
+        {"country": "US", "verdict": "caution", "summary": "Risk claim present"}
+    ]
+
+    result = audit_report_citations(report)
+
+    assert result["unsupported_claim_count"] == 1

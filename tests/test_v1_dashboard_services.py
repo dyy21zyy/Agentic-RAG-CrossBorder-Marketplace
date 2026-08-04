@@ -82,3 +82,18 @@ def test_dashboard_launcher_help_is_safe_without_streamlit():
     assert proc.returncode == 0, output
     assert "usage" in output.lower()
     assert "streamlit" in output.lower()
+
+
+def test_dashboard_launcher_handles_streamlit_missing_at_call_time(monkeypatch, capsys):
+    launcher_path = "scripts/run_dashboard.py"
+    spec = importlib.util.spec_from_file_location("run_dashboard_call_time", launcher_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    def raise_missing_streamlit():
+        raise ModuleNotFoundError("No module named 'streamlit'", name="streamlit")
+
+    monkeypatch.setattr(module, "_load_dashboard_main", lambda: raise_missing_streamlit)
+
+    assert module.main([]) == 0
+    assert "optional dashboard dependency" in capsys.readouterr().out

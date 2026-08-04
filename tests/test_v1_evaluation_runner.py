@@ -46,6 +46,31 @@ def test_run_fixture_evaluation_returns_summary():
     assert run.summary["insufficient_evidence"] == 1
 
 
+class FailingRuntime(FakeRuntime):
+    def __init__(self):
+        self.calls = 0
+
+    def run(self, query, target_markets=None, scope=None):
+        self.calls += 1
+        if self.calls == 1:
+            raise RuntimeError("backend unavailable")
+        return super().run(query, target_markets=target_markets, scope=scope)
+
+
+def test_run_fixture_evaluation_captures_runtime_failures_and_counts_tool_failure_rate():
+    run = run_fixture_evaluation(
+        [
+            {"id": "Q1", "query": "first", "target_markets": ["US"], "scope": ["trademark"]},
+            {"id": "Q2", "query": "second", "target_markets": ["US"], "scope": ["trademark"]},
+        ],
+        runtime=FailingRuntime(),
+    )
+
+    assert run.sample_count == 2
+    assert run.metrics["runtime_failure_count"] == 1
+    assert run.metrics["tool_failure_rate"] == 0.5
+
+
 def test_cli_runtime_selection_honors_configured_factory(monkeypatch):
     evaluate = _load_evaluate_script()
     monkeypatch.delenv("CROSSBORDER_EVAL_RUNTIME_FACTORY", raising=False)

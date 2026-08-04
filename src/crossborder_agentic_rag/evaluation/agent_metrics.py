@@ -33,8 +33,13 @@ def agentic_process_valid(trace, tool_calls, pipeline_mode="agentic"):
 
 def agent_metrics(report: RiskScreeningReport) -> dict[str, float | int]:
     """Return report-level agent metrics for a fixture evaluation."""
+    outcomes = []
+    for result in report.module_results:
+        if isinstance(result, dict):
+            outcomes.append(str(result.get("status") or result.get("tool_status") or "ok"))
+    failures = sum(1 for outcome in outcomes if outcome.lower() in {"failed", "error", "tool_error"})
     return {
-        "tool_failure_rate": 0.0,
+        "tool_failure_rate": failures / len(outcomes) if outcomes else 0.0,
         "missing_evidence_count": len(report.missing_evidence),
         "evidence_count": len(report.evidence_items),
     }

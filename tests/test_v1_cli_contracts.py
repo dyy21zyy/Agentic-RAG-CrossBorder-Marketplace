@@ -74,3 +74,47 @@ def test_query_cli_json_output_emits_unicode_without_ascii_escaping():
     assert proc.returncode == 0, proc.stderr
     json.loads(proc.stdout)
     assert "\\u" not in proc.stdout
+
+
+def test_query_cli_default_runtime_loads_app_config(monkeypatch):
+    calls = {}
+
+    class FakeRuntime:
+        def run(self, query, target_markets=None, scope=None):
+            return type(
+                "Report",
+                (),
+                {
+                    "to_dict": lambda self: {
+                        "query": query,
+                        "target_markets": target_markets,
+                        "scope": scope,
+                    }
+                },
+            )()
+
+    def fake_factory(config_path):
+        calls["config_path"] = config_path
+        return FakeRuntime()
+
+    monkeypatch.setattr(QUERY_MODULE, "build_runtime_from_config", fake_factory)
+    monkeypatch.setattr(QUERY_MODULE, "print", lambda text: calls.setdefault("stdout", text))
+
+    assert QUERY_MODULE.main(["query", "--output-json"]) == 0
+    assert calls["config_path"].name == "app.yaml"
+    assert json.loads(calls["stdout"])["target_markets"] == ["US"]
+
+
+def test_query_cli_requires_explicit_offline_template_for_empty_runtime(monkeypatch):
+    calls = {}
+
+    class FakeRuntime:
+        def run(self, query, target_markets=None, scope=None):
+            return type("Report", (), {"to_dict": lambda self: {"offline": True}})()
+
+    monkeypatch.setattr(QUERY_MODULE, "build_offline_template_runtime", lambda: calls.setdefault("offline", FakeRuntime()))
+    monkeypatch.setattr(QUERY_MODULE, "print", lambda text: calls.setdefault("stdout", text))
+
+    assert QUERY_MODULE.main(["query", "--offline-template", "--output-json"]) == 0
+    assert "offline" in calls
+    assert json.loads(calls["stdout"]) == {"offline": True}

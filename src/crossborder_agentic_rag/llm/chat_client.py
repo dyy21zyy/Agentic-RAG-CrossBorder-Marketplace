@@ -117,10 +117,17 @@ class OpenAICompatibleChatClient:
             usage = usage_obj.model_dump() if hasattr(usage_obj, "model_dump") else (dict(usage_obj) if isinstance(usage_obj, dict) else None)
             raw = {"choices": [{"message": {"content": str(content)}}]}
             if self.disable_thinking and not disable_thinking_applied:
-                raw = {
-                    "disable_thinking_requested": True,
-                    "disable_thinking_applied": False,
-                }
+                return ChatResult(
+                    "",
+                    self.provider,
+                    self.model,
+                    usage=usage,
+                    error="disable_thinking_not_applied",
+                    raw={
+                        "disable_thinking_requested": True,
+                        "disable_thinking_applied": False,
+                    },
+                )
             return ChatResult(str(content), self.provider, self.model, usage=usage, raw=raw)
         except Exception as exc:
             return ChatResult("", self.provider, self.model, error=str(exc))

@@ -38,6 +38,7 @@ def build_risk_screening_report(
         RiskVerdict.INSUFFICIENT_EVIDENCE: "建议补充缺失证据后再进行判断。",
     }
     summary_text = summary_texts[verdict]
+    all_evidence_ids = [hit.evidence_id for hit in evidence_hits]
     return RiskScreeningReport(
         report_id=f"report-{uuid4().hex}",
         trace_id=trace_id,
@@ -47,7 +48,12 @@ def build_risk_screening_report(
         screening_scope=list(scope),
         overall_verdict=verdict,
         country_summaries=[
-            {"country": market, "verdict": verdict.value, "summary": summary_text}
+            {
+                "country": market,
+                "verdict": verdict.value,
+                "summary": summary_text,
+                "evidence_ids": list(all_evidence_ids),
+            }
             for market in target_markets
         ],
         risk_cards=risk_cards,

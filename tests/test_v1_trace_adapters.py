@@ -78,8 +78,10 @@ def test_runtime_records_structural_events_without_reasoning_content():
 
     assert [event.event_type for event in sink.events] == [
         "normalize_query",
+        "query_rewrite",
         "plan_tools",
         "tool_call",
+        "retrieval_result",
         "evidence_gap",
         "report",
     ]

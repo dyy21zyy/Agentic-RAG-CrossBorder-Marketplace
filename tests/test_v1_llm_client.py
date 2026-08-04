@@ -95,6 +95,32 @@ def test_openai_complete_type_error_fallback_records_safe_metadata(monkeypatch):
     assert result.raw == {"disable_thinking_requested": True, "disable_thinking_applied": False}
 
 
+def test_openai_complete_type_error_fallback_does_not_return_reasoning_tags(monkeypatch):
+    class _ThinkingResponse(_FakeResponse):
+        class choices:
+            class _Choice:
+                class message:
+                    content = "<think>private reasoning</think>{\"query_type\": \"trademark\"}"
+                    reasoning_content = "private reasoning"
+
+            _Choice = _Choice
+
+    def create(kwargs):
+        if "extra_body" in kwargs:
+            raise TypeError("extra_body unsupported")
+        response = _ThinkingResponse()
+        response.choices = [response.choices._Choice()]
+        return response
+
+    _install_fake_openai(monkeypatch, create)
+    result = OpenAICompatibleChatClient("EMPTY", "http://example.invalid/v1", "qwen-compatible").complete([])
+
+    assert result.content == ""
+    assert result.error == "disable_thinking_not_applied"
+    assert "private reasoning" not in str(result.raw)
+    assert "<think>" not in str(result.raw)
+
+
 def test_openai_complete_structured_parses_fenced_json(monkeypatch):
     class _FencedResponse(_FakeResponse):
         class choices:

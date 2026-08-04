@@ -21,13 +21,19 @@ def run_fixture_evaluation(eval_rows: list[dict[str, Any]], runtime) -> Evaluati
     verdicts: Counter[str] = Counter()
     citation_rows: list[dict[str, Any]] = []
     agent_rows: list[dict[str, float | int]] = []
+    runtime_failure_count = 0
 
     for row in eval_rows:
-        report = runtime.run(
-            row["query"],
-            target_markets=row.get("target_markets"),
-            scope=row.get("scope"),
-        )
+        try:
+            report = runtime.run(
+                row["query"],
+                target_markets=row.get("target_markets"),
+                scope=row.get("scope"),
+            )
+        except Exception:
+            runtime_failure_count += 1
+            agent_rows.append({"tool_failure_rate": 1.0, "missing_evidence_count": 0, "evidence_count": 0})
+            continue
         verdicts[report.overall_verdict.value] += 1
         citation_rows.append(citation_metrics(report))
         agent_rows.append(agent_metrics(report))
@@ -37,6 +43,7 @@ def run_fixture_evaluation(eval_rows: list[dict[str, Any]], runtime) -> Evaluati
         "citation_coverage": _mean([row["citation_coverage"] for row in citation_rows]),
         "unsupported_claim_count": sum(row["unsupported_claim_count"] for row in citation_rows),
         "tool_failure_rate": _mean([float(row["tool_failure_rate"]) for row in agent_rows]),
+        "runtime_failure_count": runtime_failure_count,
         "missing_evidence_count": _mean([float(row["missing_evidence_count"]) for row in agent_rows]),
         "evidence_count": _mean([float(row["evidence_count"]) for row in agent_rows]),
     }

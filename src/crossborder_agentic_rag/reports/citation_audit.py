@@ -7,22 +7,39 @@ from crossborder_agentic_rag.schemas import RiskScreeningReport, RiskVerdict
 
 def audit_report_citations(report: RiskScreeningReport) -> dict[str, Any]:
     evidence_ids = {item.evidence_id for item in report.evidence_items}
+    evidence_by_id = {item.evidence_id: item for item in report.evidence_items}
     risk_verdicts = {verdict.value for verdict in RiskVerdict}
-    claims = [
+    metric_claims = [
         result
         for result in report.module_results
         if result.get("verdict") in risk_verdicts
     ]
+    support_claims = list(metric_claims)
+    support_claims.extend(
+        summary
+        for summary in report.country_summaries
+        if summary.get("verdict") in risk_verdicts and summary.get("summary")
+    )
     valid_claims = 0
     referenced_ids: list[str] = []
-    for claim in claims:
+    for claim in support_claims:
+        claim_ids = claim.get("evidence_ids", [])
+        if claim_ids and all(
+            evidence_id in evidence_ids
+            and evidence_by_id[evidence_id].chunk_id in evidence_by_id[evidence_id].citation
+            for evidence_id in claim_ids
+        ):
+            valid_claims += 1
+    for claim in metric_claims:
         claim_ids = claim.get("evidence_ids", [])
         if isinstance(claim_ids, list):
             referenced_ids.extend(claim_ids)
-        if claim_ids and all(evidence_id in evidence_ids for evidence_id in claim_ids):
-            valid_claims += 1
 
-    valid_references = sum(evidence_id in evidence_ids for evidence_id in referenced_ids)
+    valid_references = sum(
+        evidence_id in evidence_ids
+        and evidence_by_id[evidence_id].chunk_id in evidence_by_id[evidence_id].citation
+        for evidence_id in referenced_ids
+    )
     valid_citation_rate = (
         valid_references / len(referenced_ids) if referenced_ids else 1.0
     )
@@ -32,5 +49,5 @@ def audit_report_citations(report: RiskScreeningReport) -> dict[str, Any]:
     return {
         "valid_citation_rate": valid_citation_rate,
         "citation_coverage": citation_coverage,
-        "unsupported_claim_count": len(claims) - valid_claims,
+        "unsupported_claim_count": len(support_claims) - valid_claims,
     }

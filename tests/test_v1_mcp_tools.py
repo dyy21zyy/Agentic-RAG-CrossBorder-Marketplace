@@ -1,12 +1,14 @@
 import json
 import subprocess
 import sys
+import types
 from datetime import datetime
 from pathlib import Path
 
 import pytest
 
 from crossborder_agentic_rag.mcp_server.resources import get_trace_resource
+from crossborder_agentic_rag.mcp_server import server as mcp_server
 from crossborder_agentic_rag.mcp_server.tools import search_evidence_tool
 from crossborder_agentic_rag.mcp_server.tools import query_ip_risk_tool
 from crossborder_agentic_rag.schemas import EvidenceHit, RiskScreeningReport, RiskVerdict
@@ -92,6 +94,50 @@ def test_get_trace_resource_reads_jsonl_trace(tmp_path: Path):
 
 def test_get_trace_resource_returns_not_found_for_missing_trace(tmp_path: Path):
     assert get_trace_resource("missing", tmp_path) == {"trace_id": "missing", "error": "TRACE_NOT_FOUND"}
+
+
+def test_get_trace_resource_rejects_path_traversal(tmp_path: Path):
+    trace_dir = tmp_path / "traces"
+    trace_dir.mkdir()
+    secret = tmp_path / "secret.jsonl"
+    secret.write_text('{"step": "secret"}\n', encoding="utf-8")
+
+    response = get_trace_resource("../secret", trace_dir)
+
+    assert response == {"trace_id": "../secret", "error": "INVALID_TRACE_ID"}
+
+
+def test_create_mcp_server_registers_tools_and_trace_resource_with_fake_mcp(tmp_path: Path, monkeypatch):
+    registered = {"tools": [], "resources": []}
+
+    class FakeFastMCP:
+        def __init__(self, name):
+            self.name = name
+
+        def tool(self, name=None):
+            def decorator(func):
+                registered["tools"].append(name or func.__name__)
+                return func
+
+            return decorator
+
+        def resource(self, uri):
+            def decorator(func):
+                registered["resources"].append(uri)
+                return func
+
+            return decorator
+
+    fake_mcp = types.SimpleNamespace(server=types.SimpleNamespace(fastmcp=types.SimpleNamespace(FastMCP=FakeFastMCP)))
+    monkeypatch.setitem(sys.modules, "mcp", fake_mcp)
+    monkeypatch.setitem(sys.modules, "mcp.server", fake_mcp.server)
+    monkeypatch.setitem(sys.modules, "mcp.server.fastmcp", fake_mcp.server.fastmcp)
+
+    server = mcp_server.create_mcp_server(runtime=FakeRuntime(), trace_dir=tmp_path)
+
+    assert server.name == "crossborder-ip-risk-agentic-rag"
+    assert registered["tools"] == ["query_ip_risk", "search_evidence"]
+    assert registered["resources"] == ["trace://{trace_id}"]
 
 
 @pytest.mark.parametrize("tool", [query_ip_risk_tool, search_evidence_tool])

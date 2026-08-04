@@ -143,6 +143,37 @@ def test_runtime_returns_structured_report():
     assert report.evidence_items[0].tool_name == "trademark_search_tool"
 
 
+class RecordingTraceSink:
+    def __init__(self):
+        self.events = []
+
+    def record(self, event):
+        self.events.append(event.to_dict())
+
+
+def test_runtime_uses_unique_trace_ids_and_structured_non_reasoning_events():
+    sink = RecordingTraceSink()
+    runtime = RiskScreeningRuntime(dispatcher=FakeDispatcher(), llm=None, trace_sink=sink)
+
+    first = runtime.run("Can I sell a phone case?", target_markets=["US"], scope=["trademark"])
+    second = runtime.run("Can I sell a phone case?", target_markets=["US"], scope=["trademark"])
+
+    assert first.trace_id != second.trace_id
+    assert first.trace_id.startswith("trace-")
+    first_steps = [event["step"] for event in sink.events if event["trace_id"] == first.trace_id]
+    assert first_steps == [
+        "normalize_query",
+        "query_rewrite",
+        "plan_tools",
+        "tool_call",
+        "retrieval_result",
+        "evidence_gap",
+        "report",
+    ]
+    assert "private reasoning" not in str(sink.events)
+    assert "<think>" not in str(sink.events)
+
+
 def test_dispatcher_without_backends_returns_empty_hits():
     dispatcher = ToolDispatcher()
 

@@ -8,6 +8,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+STREAMLIT_HELP = (
+    "Streamlit is not installed. Install the optional dashboard dependency "
+    "with `python -m pip install -e \".[dashboard]\"` to launch the UI."
+)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -17,19 +21,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _load_dashboard_main():
+    from crossborder_agentic_rag.dashboard.app import main as dashboard_main
+
+    return dashboard_main
+
+
 def main(argv: list[str] | None = None) -> int:
     parse_args(argv)
     try:
-        from crossborder_agentic_rag.dashboard.app import main as dashboard_main
+        dashboard_main = _load_dashboard_main()
+        dashboard_main()
     except ModuleNotFoundError as exc:
         if exc.name != "streamlit":
             raise
-        print(
-            "Streamlit is not installed. Install the optional dashboard dependency "
-            "with `python -m pip install -e \".[dashboard]\"` to launch the UI."
-        )
+        print(STREAMLIT_HELP)
         return 0
-    dashboard_main()
     return 0
 
 

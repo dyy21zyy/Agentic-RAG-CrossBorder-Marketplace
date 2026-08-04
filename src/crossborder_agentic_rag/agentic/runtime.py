@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from crossborder_agentic_rag.agentic.evidence_gap import find_missing_evidence
 from crossborder_agentic_rag.agentic.normalizer import normalize_user_query
 from crossborder_agentic_rag.agentic.planner import plan_tools
+from crossborder_agentic_rag.agentic.rewriter import rewrite_for_scenario
 from crossborder_agentic_rag.observability.trace import TraceSink
 from crossborder_agentic_rag.reports.builder import build_risk_screening_report
 from crossborder_agentic_rag.schemas import RiskScreeningReport, TraceEvent
@@ -37,7 +39,7 @@ class RiskScreeningRuntime:
         scope: list[str] | None = None,
     ) -> RiskScreeningReport:
         selected_scope = scope or ["trademark", "patent", "litigation"]
-        trace_id = "trace-local"
+        trace_id = f"trace-{uuid4().hex}"
         normalized = normalize_user_query(query, target_markets)
         self._record(
             trace_id,
@@ -47,6 +49,13 @@ class RiskScreeningRuntime:
                 "target_markets": list(normalized["target_markets"]),
                 "scope": list(selected_scope),
             },
+        )
+        rewritten = rewrite_for_scenario(str(normalized["query"]), selected_scope)
+        self._record(
+            trace_id,
+            "query_rewrite",
+            "query_rewrite",
+            {"source_types": sorted(rewritten), "rewrite_count": len(rewritten)},
         )
         actions = plan_tools(str(normalized["query"]), selected_scope, llm=self.llm)
         self._record(
@@ -60,13 +69,27 @@ class RiskScreeningRuntime:
         )
         hits = []
         for action in actions:
+            tool = str(action.get("tool", ""))
+            retrieval_mode = str(action.get("retrieval_mode", ""))
             self._record(
                 trace_id,
                 "tool_call",
                 "tool_call",
-                {"tool": str(action.get("tool", "")), "retrieval_mode": str(action.get("retrieval_mode", ""))},
+                {"tool": tool, "retrieval_mode": retrieval_mode},
             )
-            hits.extend(self.dispatcher.run(action))
+            action_hits = self.dispatcher.run(action)
+            hits.extend(action_hits)
+            self._record(
+                trace_id,
+                "retrieval_result",
+                "retrieval_result",
+                {
+                    "tool": tool,
+                    "retrieval_mode": retrieval_mode,
+                    "evidence_count": len(action_hits),
+                    "source_types": sorted({hit.source_type for hit in action_hits}),
+                },
+            )
         missing = find_missing_evidence(selected_scope, hits)
         self._record(
             trace_id,
