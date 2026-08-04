@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from crossborder_agentic_rag.schemas._json import json_safe
+
 
 def query_ip_risk_tool(payload: dict[str, Any], runtime) -> dict[str, Any]:
     """Run one risk screen and adapt its report to MCP content blocks."""
@@ -36,7 +38,15 @@ def search_evidence_tool(payload: dict[str, Any], dispatcher) -> dict[str, Any]:
     action = dict(payload)
     action.setdefault("tool", "evidence_search_tool")
     hits = dispatcher.run(action)
-    evidence = [hit.to_dict() if hasattr(hit, "to_dict") else dict(hit) for hit in (hits or [])]
+    evidence = []
+    for hit in hits or []:
+        if hasattr(hit, "to_dict"):
+            serialized = hit.to_dict()
+        elif isinstance(hit, dict):
+            serialized = hit
+        else:
+            raise TypeError("evidence hits must provide to_dict() or be a JSON-safe dict")
+        evidence.append(json_safe(serialized, "evidence_hit"))
     return {
         "structuredContent": {"evidence_items": evidence},
         "content": [{"type": "text", "text": f"{len(evidence)} evidence items"}],
