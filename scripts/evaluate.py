@@ -94,6 +94,11 @@ def main() -> int:
         json.dumps({key: run.metrics[key] for key in ("tool_failure_rate", "missing_evidence_count", "evidence_count")}, indent=2),
         encoding="utf-8",
     )
+    if run.runtime_failures:
+        (args.output_dir / "runtime_failures.json").write_text(
+            json.dumps(run.runtime_failures, indent=2),
+            encoding="utf-8",
+        )
     return 0
 
 

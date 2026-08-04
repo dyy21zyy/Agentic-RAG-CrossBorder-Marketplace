@@ -9,6 +9,7 @@ from crossborder_agentic_rag.agentic.dispatcher import ToolDispatcher
 from crossborder_agentic_rag.agentic.runtime_factory import build_offline_template_runtime
 from crossborder_agentic_rag.mcp_server.resources import get_trace_resource
 from crossborder_agentic_rag.mcp_server.tools import query_ip_risk_tool, search_evidence_tool
+from crossborder_agentic_rag.observability.jsonl_trace import LocalJsonlTraceSink
 
 
 def create_mcp_server(runtime=None, dispatcher=None, trace_dir: str | Path = "traces") -> Any:
@@ -19,7 +20,11 @@ def create_mcp_server(runtime=None, dispatcher=None, trace_dir: str | Path = "tr
             "MCP server requires the optional 'mcp' package; install the mcp extra to launch it."
         ) from exc
 
-    resolved_runtime = runtime or build_offline_template_runtime()
+    trace_location = Path(trace_dir)
+    trace_log = trace_location if trace_location.suffix == ".jsonl" else trace_location / "local.jsonl"
+    resolved_runtime = runtime or build_offline_template_runtime(
+        trace_sink=LocalJsonlTraceSink(trace_log)
+    )
     resolved_dispatcher = dispatcher or getattr(resolved_runtime, "dispatcher", None) or ToolDispatcher()
     server = FastMCP("crossborder-ip-risk-agentic-rag")
 

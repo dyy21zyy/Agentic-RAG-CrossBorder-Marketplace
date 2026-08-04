@@ -92,6 +92,26 @@ def test_get_trace_resource_reads_jsonl_trace(tmp_path: Path):
     }
 
 
+def test_get_trace_resource_filters_append_only_trace_log(tmp_path: Path):
+    trace_log = tmp_path / "local.jsonl"
+    trace_log.write_text(
+        '{"trace_id": "trace-1", "step": "normalize_query"}\n'
+        '{"trace_id": "trace-2", "step": "normalize_query"}\n'
+        '{"trace_id": "trace-1", "step": "report"}\n',
+        encoding="utf-8",
+    )
+
+    response = get_trace_resource("trace-1", tmp_path)
+
+    assert response == {
+        "trace_id": "trace-1",
+        "events": [
+            {"trace_id": "trace-1", "step": "normalize_query"},
+            {"trace_id": "trace-1", "step": "report"},
+        ],
+    }
+
+
 def test_get_trace_resource_returns_not_found_for_missing_trace(tmp_path: Path):
     assert get_trace_resource("missing", tmp_path) == {"trace_id": "missing", "error": "TRACE_NOT_FOUND"}
 
@@ -108,7 +128,7 @@ def test_get_trace_resource_rejects_path_traversal(tmp_path: Path):
 
 
 def test_create_mcp_server_registers_tools_and_trace_resource_with_fake_mcp(tmp_path: Path, monkeypatch):
-    registered = {"tools": [], "resources": []}
+    registered = {"tools": {}, "resources": {}}
 
     class FakeFastMCP:
         def __init__(self, name):
@@ -116,14 +136,14 @@ def test_create_mcp_server_registers_tools_and_trace_resource_with_fake_mcp(tmp_
 
         def tool(self, name=None):
             def decorator(func):
-                registered["tools"].append(name or func.__name__)
+                registered["tools"][name or func.__name__] = func
                 return func
 
             return decorator
 
         def resource(self, uri):
             def decorator(func):
-                registered["resources"].append(uri)
+                registered["resources"][uri] = func
                 return func
 
             return decorator
@@ -136,8 +156,51 @@ def test_create_mcp_server_registers_tools_and_trace_resource_with_fake_mcp(tmp_
     server = mcp_server.create_mcp_server(runtime=FakeRuntime(), trace_dir=tmp_path)
 
     assert server.name == "crossborder-ip-risk-agentic-rag"
-    assert registered["tools"] == ["query_ip_risk", "search_evidence"]
-    assert registered["resources"] == ["trace://{trace_id}"]
+    assert list(registered["tools"]) == ["query_ip_risk", "search_evidence"]
+    assert list(registered["resources"]) == ["trace://{trace_id}"]
+
+
+def test_create_mcp_server_default_query_trace_is_readable(tmp_path: Path, monkeypatch):
+    registered = {"tools": {}, "resources": {}}
+
+    class FakeFastMCP:
+        def __init__(self, name):
+            self.name = name
+
+        def tool(self, name=None):
+            def decorator(func):
+                registered["tools"][name or func.__name__] = func
+                return func
+
+            return decorator
+
+        def resource(self, uri):
+            def decorator(func):
+                registered["resources"][uri] = func
+                return func
+
+            return decorator
+
+    fake_mcp = types.SimpleNamespace(server=types.SimpleNamespace(fastmcp=types.SimpleNamespace(FastMCP=FakeFastMCP)))
+    monkeypatch.setitem(sys.modules, "mcp", fake_mcp)
+    monkeypatch.setitem(sys.modules, "mcp.server", fake_mcp.server)
+    monkeypatch.setitem(sys.modules, "mcp.server.fastmcp", fake_mcp.server.fastmcp)
+
+    mcp_server.create_mcp_server(trace_dir=tmp_path)
+    response = registered["tools"]["query_ip_risk"]({"query": "brand logo phone case", "scope": ["trademark"]})
+    trace_id = response["structuredContent"]["trace_id"]
+
+    trace = registered["resources"]["trace://{trace_id}"](trace_id)
+
+    assert [event["event_type"] for event in trace["events"]] == [
+        "normalize_query",
+        "query_rewrite",
+        "plan_tools",
+        "tool_call",
+        "retrieval_result",
+        "evidence_gap",
+        "report",
+    ]
 
 
 @pytest.mark.parametrize("tool", [query_ip_risk_tool, search_evidence_tool])

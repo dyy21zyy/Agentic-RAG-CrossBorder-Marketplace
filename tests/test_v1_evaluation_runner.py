@@ -69,6 +69,16 @@ def test_run_fixture_evaluation_captures_runtime_failures_and_counts_tool_failur
     assert run.sample_count == 2
     assert run.metrics["runtime_failure_count"] == 1
     assert run.metrics["tool_failure_rate"] == 0.5
+    assert run.artifact_paths["runtime_failures"] == "runtime_failures.json"
+    assert run.runtime_failures == [
+        {
+            "row_id": "Q1",
+            "query": "first",
+            "error_type": "RuntimeError",
+            "error_message": "backend unavailable",
+        }
+    ]
+    assert run.to_dict()["runtime_failures"] == run.runtime_failures
 
 
 def test_cli_runtime_selection_honors_configured_factory(monkeypatch):

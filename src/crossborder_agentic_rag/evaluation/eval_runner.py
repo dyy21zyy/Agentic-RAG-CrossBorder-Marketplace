@@ -22,6 +22,7 @@ def run_fixture_evaluation(eval_rows: list[dict[str, Any]], runtime) -> Evaluati
     citation_rows: list[dict[str, Any]] = []
     agent_rows: list[dict[str, float | int]] = []
     runtime_failure_count = 0
+    runtime_failures: list[dict[str, str]] = []
 
     for row in eval_rows:
         try:
@@ -30,8 +31,16 @@ def run_fixture_evaluation(eval_rows: list[dict[str, Any]], runtime) -> Evaluati
                 target_markets=row.get("target_markets"),
                 scope=row.get("scope"),
             )
-        except Exception:
+        except Exception as exc:
             runtime_failure_count += 1
+            runtime_failures.append(
+                {
+                    "row_id": str(row.get("id") or row.get("query_id") or ""),
+                    "query": str(row.get("query") or ""),
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                }
+            )
             agent_rows.append({"tool_failure_rate": 1.0, "missing_evidence_count": 0, "evidence_count": 0})
             continue
         verdicts[report.overall_verdict.value] += 1
@@ -54,4 +63,6 @@ def run_fixture_evaluation(eval_rows: list[dict[str, Any]], runtime) -> Evaluati
         sample_count=len(eval_rows),
         verdict_counts=dict(verdicts),
         metrics=metrics,
+        artifact_paths={"runtime_failures": "runtime_failures.json"} if runtime_failures else {},
+        runtime_failures=runtime_failures,
     )

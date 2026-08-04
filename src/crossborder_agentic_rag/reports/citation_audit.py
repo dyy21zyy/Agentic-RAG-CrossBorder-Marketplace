@@ -5,6 +5,10 @@ from typing import Any
 from crossborder_agentic_rag.schemas import RiskScreeningReport, RiskVerdict
 
 
+def _has_valid_citation_token(item) -> bool:
+    return str(item.citation).strip().startswith(f"[{item.chunk_id}]")
+
+
 def audit_report_citations(report: RiskScreeningReport) -> dict[str, Any]:
     evidence_ids = {item.evidence_id for item in report.evidence_items}
     evidence_by_id = {item.evidence_id: item for item in report.evidence_items}
@@ -26,7 +30,7 @@ def audit_report_citations(report: RiskScreeningReport) -> dict[str, Any]:
         claim_ids = claim.get("evidence_ids", [])
         if claim_ids and all(
             evidence_id in evidence_ids
-            and evidence_by_id[evidence_id].chunk_id in evidence_by_id[evidence_id].citation
+            and _has_valid_citation_token(evidence_by_id[evidence_id])
             for evidence_id in claim_ids
         ):
             valid_claims += 1
@@ -37,7 +41,7 @@ def audit_report_citations(report: RiskScreeningReport) -> dict[str, Any]:
 
     valid_references = sum(
         evidence_id in evidence_ids
-        and evidence_by_id[evidence_id].chunk_id in evidence_by_id[evidence_id].citation
+        and _has_valid_citation_token(evidence_by_id[evidence_id])
         for evidence_id in referenced_ids
     )
     valid_citation_rate = (

@@ -12,6 +12,7 @@ from crossborder_agentic_rag.config.registry import PluginRegistry
 from crossborder_agentic_rag.config.settings import load_app_config
 from crossborder_agentic_rag.llm.chat_client import TemplateChatClient, build_chat_client
 from crossborder_agentic_rag.observability.jsonl_trace import LocalJsonlTraceSink
+from crossborder_agentic_rag.observability.trace import TraceSink
 from crossborder_agentic_rag.retrieval.bm25 import LocalBM25Retriever
 from crossborder_agentic_rag.schemas import EvidenceChunk
 
@@ -65,8 +66,12 @@ def build_registry() -> PluginRegistry:
     return registry
 
 
-def build_offline_template_runtime() -> RiskScreeningRuntime:
-    return RiskScreeningRuntime(dispatcher=ToolDispatcher(), llm=TemplateChatClient())
+def build_offline_template_runtime(trace_sink: TraceSink | None = None) -> RiskScreeningRuntime:
+    return RiskScreeningRuntime(
+        dispatcher=ToolDispatcher(),
+        llm=TemplateChatClient(),
+        trace_sink=trace_sink,
+    )
 
 
 def build_runtime_from_config(config_path: str | Path) -> RiskScreeningRuntime:

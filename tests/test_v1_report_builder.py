@@ -91,6 +91,23 @@ def test_citation_audit_rejects_corrupt_evidence_hit_citation():
     assert result["unsupported_claim_count"] == 2
 
 
+def test_citation_audit_rejects_chunk_id_substring_not_citation_token():
+    report = build_risk_screening_report(
+        query="q",
+        target_markets=["US"],
+        scope=["trademark"],
+        evidence_hits=[make_hit()],
+        missing_evidence=[],
+        trace_id="trace-1",
+    )
+    report.evidence_items[0].citation = "[xtrademark:1:chunk:0x] Wrong source"
+
+    result = audit_report_citations(report)
+
+    assert result["valid_citation_rate"] == 0.0
+    assert result["unsupported_claim_count"] == 2
+
+
 def test_citation_audit_rejects_country_summary_claim_without_evidence_refs():
     report = build_risk_screening_report(
         query="q",

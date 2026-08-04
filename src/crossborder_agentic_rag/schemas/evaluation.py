@@ -15,6 +15,7 @@ class EvaluationRun:
     verdict_counts: dict[str, int] = field(default_factory=dict)
     metrics: dict[str, float] = field(default_factory=dict)
     artifact_paths: dict[str, str] = field(default_factory=dict)
+    runtime_failures: list[dict[str, str]] = field(default_factory=list)
 
     @property
     def summary(self) -> dict[str, Any]:
@@ -30,6 +31,7 @@ class EvaluationRun:
             "verdict_counts": dict(self.verdict_counts),
             "metrics": dict(self.metrics),
             "artifact_paths": dict(self.artifact_paths),
+            "runtime_failures": [dict(item) for item in self.runtime_failures],
         }
 
     @classmethod
