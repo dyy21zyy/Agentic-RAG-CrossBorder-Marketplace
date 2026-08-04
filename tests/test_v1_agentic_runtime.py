@@ -110,6 +110,7 @@ def test_plan_tools_falls_back_for_malformed_llm_output():
 
 from crossborder_agentic_rag.agentic.runtime import RiskScreeningRuntime
 from crossborder_agentic_rag.agentic.dispatcher import ToolDispatcher
+from crossborder_agentic_rag.retrieval.source_balanced import SourceBalancedRetriever
 from crossborder_agentic_rag.schemas import EvidenceChunk, EvidenceHit, RiskVerdict
 
 
@@ -178,6 +179,44 @@ def test_dispatcher_adapts_retriever_without_mode_parameter():
     assert len(hits) == 1
     assert hits[0].retrieval_mode == "hybrid_rerank"
     assert hits[0].source_type == "trademark"
+
+
+class SourceBalancedBaseRetriever:
+    def retrieve(self, **kwargs):
+        source_type = kwargs["source_types"][0]
+        return [
+            EvidenceChunk(
+                chunk_id=f"{source_type}:1:chunk:0",
+                doc_id=f"{source_type}:1",
+                source_type=source_type,
+                source_subtype="registration",
+                title="Source-balanced evidence",
+                content=kwargs["query"],
+                score=0.9,
+            )
+        ]
+
+
+def test_dispatcher_adapts_actual_source_balanced_retriever():
+    retriever = SourceBalancedRetriever(
+        SourceBalancedBaseRetriever(), per_source_k=1, final_k=1
+    )
+    dispatcher = ToolDispatcher(retriever=retriever)
+
+    hits = dispatcher.run(
+        {
+            "tool": "trademark_search_tool",
+            "query": "smart phone case",
+            "retrieval_mode": "hybrid_rerank",
+            "required_evidence": "trademark",
+        }
+    )
+
+    assert len(hits) == 1
+    assert isinstance(hits[0], EvidenceHit)
+    assert hits[0].source_type == "trademark"
+    assert hits[0].retrieval_mode == "hybrid_rerank"
+    assert hits[0].metadata["source_balanced"] is True
 
 
 def test_dispatcher_assigns_unique_evidence_ids_across_actions():
