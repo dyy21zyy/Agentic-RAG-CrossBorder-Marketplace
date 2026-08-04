@@ -1,6 +1,8 @@
 import importlib.util
 import json
+import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -65,3 +67,18 @@ def test_dashboard_launcher_import_is_safe():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     assert callable(module.main)
+
+
+def test_dashboard_launcher_help_is_safe_without_streamlit():
+    root = Path(__file__).resolve().parents[1]
+    proc = subprocess.run(
+        [sys.executable, "scripts/run_dashboard.py", "--help"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+
+    output = f"{proc.stdout}\n{proc.stderr}"
+    assert proc.returncode == 0, output
+    assert "usage" in output.lower()
+    assert "streamlit" in output.lower()
