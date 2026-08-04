@@ -115,7 +115,7 @@ class OpenAICompatibleChatClient:
                 return ChatResult("", self.provider, self.model, error="LLM response content is empty")
             usage_obj = getattr(resp, "usage", None)
             usage = usage_obj.model_dump() if hasattr(usage_obj, "model_dump") else (dict(usage_obj) if isinstance(usage_obj, dict) else None)
-            raw = resp.model_dump() if hasattr(resp, "model_dump") else None
+            raw = {"choices": [{"message": {"content": str(content)}}]}
             if self.disable_thinking and not disable_thinking_applied:
                 raw = {
                     "disable_thinking_requested": True,
@@ -139,7 +139,6 @@ class OpenAICompatibleChatClient:
             return {
                 "schema_name": schema_name,
                 "error": "structured_output_parse_failed",
-                "raw_content": result.content,
             }
 
 
