@@ -151,3 +151,20 @@ def test_core_domains_verdicts_and_scopes_are_enforced():
     invalid_verdict["overall_verdict"] = "infringement_found"
     with pytest.raises(ValueError, match="overall_verdict"):
         RiskScreeningReport(**invalid_verdict)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("action_recommendations", [{"bad"}]),
+        ("missing_evidence", [{"bad"}]),
+        ("limitations", [{"bad"}]),
+        ("langfuse_url", {"bad"}),
+    ],
+)
+def test_report_rejects_unsupported_nested_output_values(field_name, value):
+    report_kwargs = _report_kwargs()
+    report_kwargs[field_name] = value
+    report = RiskScreeningReport(**report_kwargs)
+    with pytest.raises(TypeError, match="JSON-serializable"):
+        report.to_dict()

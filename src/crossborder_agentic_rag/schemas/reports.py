@@ -55,17 +55,17 @@ class RiskScreeningReport:
             "trace_id": self.trace_id,
             "created_at": self.created_at,
             "product_profile": json_safe(self.product_profile, "product_profile"),
-            "target_markets": list(self.target_markets),
-            "screening_scope": list(self.screening_scope),
+            "target_markets": json_safe(self.target_markets, "target_markets"),
+            "screening_scope": json_safe(self.screening_scope, "screening_scope"),
             "overall_verdict": self.overall_verdict.value,
             "country_summaries": json_safe(self.country_summaries, "country_summaries"),
             "risk_cards": json_safe(self.risk_cards, "risk_cards"),
             "module_results": json_safe(self.module_results, "module_results"),
             "evidence_items": [item.to_dict() for item in self.evidence_items],
-            "action_recommendations": list(self.action_recommendations),
-            "missing_evidence": list(self.missing_evidence),
-            "limitations": list(self.limitations),
-            "langfuse_url": self.langfuse_url,
+            "action_recommendations": json_safe(self.action_recommendations, "action_recommendations"),
+            "missing_evidence": json_safe(self.missing_evidence, "missing_evidence"),
+            "limitations": json_safe(self.limitations, "limitations"),
+            "langfuse_url": json_safe(self.langfuse_url, "langfuse_url"),
         }
         return result
 
