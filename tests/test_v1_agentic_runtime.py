@@ -91,3 +91,18 @@ def test_plan_tools_falls_back_when_llm_raises():
             "required_evidence": "patent",
         }
     ]
+
+
+def test_plan_tools_falls_back_for_malformed_llm_output():
+    llm = _StubLlm({"tool_plan": "not-a-list"})
+
+    plan = plan_tools("smart phone case", ["litigation"], llm=llm)
+
+    assert plan == [
+        {
+            "tool": "litigation_search_tool",
+            "query": "litigation case asserted patent smart phone case",
+            "retrieval_mode": "hybrid_rerank",
+            "required_evidence": "litigation",
+        }
+    ]
