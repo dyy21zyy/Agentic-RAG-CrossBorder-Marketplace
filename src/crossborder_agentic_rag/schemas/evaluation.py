@@ -16,6 +16,11 @@ class EvaluationRun:
     metrics: dict[str, float] = field(default_factory=dict)
     artifact_paths: dict[str, str] = field(default_factory=dict)
 
+    @property
+    def summary(self) -> dict[str, Any]:
+        """Return the compact verdict summary consumed by evaluation views."""
+        return {"n": self.sample_count, **self.verdict_counts}
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "run_id": self.run_id,
@@ -31,4 +36,6 @@ class EvaluationRun:
     def from_dict(cls, data: dict[str, Any]) -> "EvaluationRun":
         if not isinstance(data, dict):
             raise TypeError("data must be a dict")
-        return cls(**data)
+        values = dict(data)
+        values.pop("summary", None)
+        return cls(**values)
