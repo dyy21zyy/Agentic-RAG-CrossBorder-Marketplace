@@ -25,11 +25,19 @@ def build_risk_screening_report(
         "not_recommended": 1 if verdict == RiskVerdict.NOT_RECOMMENDED else 0,
         "insufficient_evidence": 1 if verdict == RiskVerdict.INSUFFICIENT_EVIDENCE else 0,
     }
-    summary_text = (
-        "命中知识产权风险信号，建议人工复核后再决定是否上架。"
-        if evidence_hits
-        else "证据不足，需补充索引或数据后再判断。"
-    )
+    summary_texts = {
+        RiskVerdict.NO_RISK_FOUND: "当前检索范围内未发现知识产权风险信号。",
+        RiskVerdict.CAUTION: "命中知识产权风险信号，建议人工复核后再决定是否上架。",
+        RiskVerdict.NOT_RECOMMENDED: "命中较高风险知识产权信号，不建议在完成进一步审查前上架。",
+        RiskVerdict.INSUFFICIENT_EVIDENCE: "证据不足，需补充索引或数据后再判断。",
+    }
+    recommendations = {
+        RiskVerdict.NO_RISK_FOUND: "当前检索范围内未发现风险信号；如有新增信息，建议重新筛查。",
+        RiskVerdict.CAUTION: "建议人工复核命中的商标、专利或诉讼证据后再决定是否上架。",
+        RiskVerdict.NOT_RECOMMENDED: "不建议在完成专业审查和风险处置前上架。",
+        RiskVerdict.INSUFFICIENT_EVIDENCE: "建议补充缺失证据后再进行判断。",
+    }
+    summary_text = summary_texts[verdict]
     return RiskScreeningReport(
         report_id=f"report-{uuid4().hex}",
         trace_id=trace_id,
@@ -52,7 +60,7 @@ def build_risk_screening_report(
             for source in scope
         ],
         evidence_items=list(evidence_hits),
-        action_recommendations=["建议人工复核命中的商标、专利或诉讼证据后再决定是否上架。"],
+        action_recommendations=[recommendations[verdict]],
         missing_evidence=list(missing_evidence),
         limitations=["本报告仅用于知识产权风险初筛和证据发现，不构成法律意见。"],
     )

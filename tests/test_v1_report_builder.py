@@ -44,6 +44,20 @@ def test_report_without_evidence_is_insufficient():
     assert report.overall_verdict == RiskVerdict.INSUFFICIENT_EVIDENCE
 
 
+def test_report_without_hits_and_missing_evidence_describes_no_risk():
+    report = build_risk_screening_report(
+        query="q",
+        target_markets=["US"],
+        scope=["trademark"],
+        evidence_hits=[],
+        missing_evidence=[],
+        trace_id="trace-1",
+    )
+    assert report.overall_verdict == RiskVerdict.NO_RISK_FOUND
+    assert "证据不足" not in report.country_summaries[0]["summary"]
+    assert all("命中" not in recommendation for recommendation in report.action_recommendations)
+
+
 def test_citation_audit_rejects_missing_evidence_reference():
     report = build_risk_screening_report(
         query="q",
@@ -53,6 +67,8 @@ def test_citation_audit_rejects_missing_evidence_reference():
         missing_evidence=[],
         trace_id="trace-1",
     )
+    report.module_results[0]["evidence_ids"] = ["UNKNOWN"]
     result = audit_report_citations(report)
-    assert result["valid_citation_rate"] == 1.0
-    assert result["unsupported_claim_count"] == 0
+    assert result["valid_citation_rate"] == 0.0
+    assert result["citation_coverage"] == 0.0
+    assert result["unsupported_claim_count"] == 1
