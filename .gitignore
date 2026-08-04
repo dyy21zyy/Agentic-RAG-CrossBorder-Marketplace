@@ -55,6 +55,9 @@ logs/
 *.bak_*
 *.diff
 
+# Codex SDD scratch workspace
+.superpowers/
+
 # temporary trace artifacts
 build_llm_query_plan
 run_initial_tool_plan
