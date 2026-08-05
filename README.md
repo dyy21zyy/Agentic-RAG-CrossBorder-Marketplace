@@ -304,6 +304,36 @@ uv run python scripts/07_build_milvus_index.py `
   --report data/processed/milvus_report.json
 ```
 
+如果本地还没有启动 Milvus，可以先运行：
+
+```powershell
+docker compose up -d
+```
+
+注意：
+
+- FakeEmbeddingProvider is only for tests and smoke runs.
+- Real semantic retrieval requires OpenAI-compatible embeddings or local sentence-transformer embeddings.
+- Dry-run mode does not insert into Milvus and should not be interpreted as successful vector indexing.
+- Real Milvus mode requires a running Milvus instance, pymilvus installed, and real embeddings configured with `--embedding-provider openai-compatible` or `--embedding-provider local`.
+
+### 7.6 兼容旧阶段脚本入口
+
+仓库仍保留早期分阶段脚本，便于复现实验和兼容已有测试。当前 README 推荐使用上面的新入口，但以下脚本仍可按需运行：
+
+```powershell
+python scripts/01_parse_trademark_xml.py --help
+python scripts/02_parse_patent_tsv.py --help
+python scripts/03_parse_litigation_csv.py --help
+python scripts/04_parse_policy_docs.py --help
+python scripts/05_build_chunks.py --help
+python scripts/06_build_duckdb.py --help
+python scripts/07_build_milvus_index.py --help
+python scripts/08_run_query_cli.py --help
+python scripts/09_run_eval.py --help
+python scripts/10_run_ablation.py --help
+```
+
 ---
 
 ## 8. 运行单条 Agentic RAG 查询
@@ -418,6 +448,8 @@ uv run python scripts/compare_rule_vs_agentic_online.py `
 - source coverage：最终证据是否覆盖期望 source types
 - answer quality proxy：answer relevance、faithfulness、context relevance 等启发式或 LLM judge 指标
 - RAGAS export fields：`ragas_user_input`、`ragas_response`、`ragas_retrieved_contexts`、`ragas_reference`
+
+FaithfulnessProxy is a heuristic, not a human-level factuality evaluator.
 
 ---
 
@@ -588,3 +620,5 @@ models/
 ## 15. 安全边界
 
 本项目输出的是知识产权风险初筛结果，不是法律意见。系统结论必须依赖可追溯证据，并保留不确定性和缺失证据说明。对于高风险商品、疑似侵权证据、专利权利要求解释、商标近似判断、诉讼风险判断和上架决策，应交由专业人员复核。
+
+This system is not legal advice. Only risk_analysis answers include Risk Level.
